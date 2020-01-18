@@ -115,7 +115,11 @@ func (s *UnifiSession) webLogin() (string, error) {
 			`{"username":%q,"password":%q,"strict":"true","remember":"true"}`,
 			s.Username, s.Password))
 
-	return s.post(u, r)
+	respBody, err := s.post(u, r)
+	if err == nil {
+		s.login = func() (string, error) { return string(respBody), nil }
+	}
+	return respBody, err
 }
 
 func (s *UnifiSession) macAction(action string, mac string) (string, error) {
@@ -165,9 +169,7 @@ func (s *UnifiSession) verb(verb string, u *url.URL, body io.Reader) (string, er
 		s.setError(err)
 		return "", s.err
 	}
-	if resp.StatusCode >= http.StatusOK && http.StatusBadRequest > resp.StatusCode {
-		s.login = func() (string, error) { return string(respBody), nil }
-	} else {
+	if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
 		s.setErrorString(http.StatusText(resp.StatusCode))
 	}
 	return string(respBody), s.err
