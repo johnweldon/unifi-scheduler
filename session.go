@@ -26,18 +26,18 @@ type Client struct {
 	MAC         string `json:"mac,omitempty"`
 	SiteID      string `json:"site_id,omitempty"`
 	OUI         string `json:"oui,omitempty"`
-	IsGuest     bool   `json:"is_guest,omitempty"`
-	FirstSeen   int    `json:"first_seen,omitempty"`
-	LastSeen    int    `json:"last_seen,omitempty"`
-	IsWired     bool   `json:"is_wired,omitempty"`
-	UsergroupID string `json:"usergroup_id,omitempty"`
-	Name        string `json:"name,omitempty"`
-	Noted       bool   `json:"noted,omitempty"`
-	UseFixedIP  bool   `json:"use_fixedip,omitempty"`
 	NetworkID   string `json:"network_id,omitempty"`
 	IP          string `json:"ip,omitempty"`
 	FixedIP     string `json:"fixed_ip,omitempty"`
 	Hostname    string `json:"hostname,omitempty"`
+	UsergroupID string `json:"usergroup_id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	FirstSeen   int    `json:"first_seen,omitempty"`
+	LastSeen    int    `json:"last_seen,omitempty"`
+	IsGuest     bool   `json:"is_guest,omitempty"`
+	IsWired     bool   `json:"is_wired,omitempty"`
+	Noted       bool   `json:"noted,omitempty"`
+	UseFixedIP  bool   `json:"use_fixedip,omitempty"`
 }
 
 // UnifiSession wraps metadata to manage session state.
@@ -55,7 +55,9 @@ func (s *UnifiSession) Initialize() error {
 	if s == nil {
 		return errors.New("nil session")
 	}
+
 	s.err = nil
+
 	if len(s.Endpoint) == 0 {
 		s.setErrorString("missing endpoint")
 	}
@@ -65,6 +67,7 @@ func (s *UnifiSession) Initialize() error {
 	if len(s.Password) == 0 {
 		s.setErrorString("missing password")
 	}
+
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		s.setError(err)
@@ -133,7 +136,7 @@ func (s *UnifiSession) webLogin() (string, error) {
 
 	respBody, err := s.post(u, r)
 	if err == nil {
-		s.login = func() (string, error) { return string(respBody), nil }
+		s.login = func() (string, error) { return respBody, nil }
 	}
 	return respBody, err
 }
@@ -185,7 +188,6 @@ func (s *UnifiSession) verb(verb string, u *url.URL, body io.Reader) (string, er
 		s.setError(err)
 		return "", s.err
 	}
-	//log.Printf("Debug:\n<<<<<\n%s\n>>>>>\n", respBody)
 	if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
 		s.setErrorString(http.StatusText(resp.StatusCode))
 	}
@@ -199,7 +201,7 @@ func (s *UnifiSession) setError(e error) {
 	if s.err == nil {
 		s.err = fmt.Errorf("%w", e)
 	} else {
-		s.err = fmt.Errorf("%w\n%w", e, s.err)
+		s.err = fmt.Errorf("%s\n%w", e, s.err)
 	}
 }
 

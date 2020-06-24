@@ -18,14 +18,17 @@ func main() {
 		Password: password,
 		Endpoint: endpoint,
 	}
+
 	if err := ses.Initialize(); err != nil {
 		log.Printf("Error:\n%v", err)
 		return
 	}
+
 	if msg, err := ses.Login(); err != nil {
 		log.Printf("Login Error: (%s)\n%v", msg, err)
 		return
 	}
+
 	u, err := ses.ListClients()
 	if err != nil {
 		log.Printf("Error:\n%v", err)
@@ -53,6 +56,7 @@ func main() {
 	if !ok {
 		fn = listFn
 	}
+
 	fn(users.Data, target)
 }
 
@@ -73,6 +77,7 @@ func (s *UnifiSession) blockFn(clients []Client, keys map[string]bool) {
 				log.Printf("%s\nerror blocking: %v", res, err)
 				return
 			}
+
 			log.Printf("%s\n", res)
 		}
 	}
@@ -87,6 +92,7 @@ func (s *UnifiSession) unblockFn(clients []Client, keys map[string]bool) {
 				log.Printf("%s\nerror unblocking: %v", res, err)
 				return
 			}
+
 			log.Printf("%s\n", res)
 		}
 	}
@@ -98,5 +104,6 @@ func firstNonEmpty(s ...string) string {
 			return candidate
 		}
 	}
+
 	return ""
 }
