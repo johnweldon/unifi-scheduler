@@ -22,22 +22,25 @@ type Response struct {
 
 // Client describes a UniFi network client.
 type Client struct {
-	ID          string `json:"_id,omitempty"`
-	MAC         string `json:"mac,omitempty"`
-	SiteID      string `json:"site_id,omitempty"`
-	OUI         string `json:"oui,omitempty"`
-	NetworkID   string `json:"network_id,omitempty"`
-	IP          string `json:"ip,omitempty"`
-	FixedIP     string `json:"fixed_ip,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	UsergroupID string `json:"usergroup_id,omitempty"`
-	Name        string `json:"name,omitempty"`
-	FirstSeen   int    `json:"first_seen,omitempty"`
-	LastSeen    int    `json:"last_seen,omitempty"`
-	IsGuest     bool   `json:"is_guest,omitempty"`
-	IsWired     bool   `json:"is_wired,omitempty"`
-	Noted       bool   `json:"noted,omitempty"`
-	UseFixedIP  bool   `json:"use_fixedip,omitempty"`
+	ID                  string `json:"_id,omitempty"`
+	MAC                 string `json:"mac,omitempty"`
+	SiteID              string `json:"site_id,omitempty"`
+	OUI                 string `json:"oui,omitempty"`
+	NetworkID           string `json:"network_id,omitempty"`
+	IP                  string `json:"ip,omitempty"`
+	FixedIP             string `json:"fixed_ip,omitempty"`
+	Hostname            string `json:"hostname,omitempty"`
+	UsergroupID         string `json:"usergroup_id,omitempty"`
+	Name                string `json:"name,omitempty"`
+	FirstSeen           int    `json:"first_seen,omitempty"`
+	LastSeen            int    `json:"last_seen,omitempty"`
+	DeviceIDOverride    int    `json:"dev_id_override,omitempty"`
+	FingerprintOverride bool   `json:"fingerprint_override,omitempty"`
+	Blocked             bool   `json:"blocked,omitempty"`
+	IsGuest             bool   `json:"is_guest,omitempty"`
+	IsWired             bool   `json:"is_wired,omitempty"`
+	Noted               bool   `json:"noted,omitempty"`
+	UseFixedIP          bool   `json:"use_fixedip,omitempty"`
 }
 
 // UnifiSession wraps metadata to manage session state.
