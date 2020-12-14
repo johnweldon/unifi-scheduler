@@ -48,6 +48,7 @@ type UnifiSession struct {
 	Endpoint string
 	Username string
 	Password string
+	csrf     string
 	client   *http.Client
 	login    func() (string, error)
 	err      error
@@ -99,7 +100,7 @@ func (s *UnifiSession) ListClients() (string, error) {
 	if s.err != nil {
 		return "", s.err
 	}
-	u, err := url.Parse(fmt.Sprintf("%s/api/s/default/rest/user", s.Endpoint))
+	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/rest/user", s.Endpoint))
 	if err != nil {
 		s.setError(err)
 		return "", s.err
@@ -127,7 +128,7 @@ func (s *UnifiSession) webLogin() (string, error) {
 	if s.err != nil {
 		return "", s.err
 	}
-	u, err := url.Parse(fmt.Sprintf("%s/api/login", s.Endpoint))
+	u, err := url.Parse(fmt.Sprintf("%s/api/auth/login", s.Endpoint))
 	if err != nil {
 		s.setError(err)
 		return "", s.err
@@ -148,7 +149,7 @@ func (s *UnifiSession) macAction(action string, mac string) (string, error) {
 	if b, err := s.login(); err != nil {
 		return b, err
 	}
-	u, err := url.Parse(fmt.Sprintf("%s/api/s/default/cmd/stamgr", s.Endpoint))
+	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/cmd/stamgr", s.Endpoint))
 	if err != nil {
 		s.setError(err)
 		return "", s.err
@@ -172,13 +173,11 @@ func (s *UnifiSession) verb(verb string, u *url.URL, body io.Reader) (string, er
 		return "", s.err
 	}
 	req.Header.Set("User-Agent", "unifibot 2.0")
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Origin", s.Endpoint)
-	for _, cookie := range s.client.Jar.Cookies(u) {
-		if cookie.Name == "csrf_token" {
-			req.Header.Set("X-CSRF-Token", cookie.Value)
-		}
+	if s.csrf != "" {
+		req.Header.Set("x-csrf-token", s.csrf)
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -186,6 +185,9 @@ func (s *UnifiSession) verb(verb string, u *url.URL, body io.Reader) (string, er
 		return "", s.err
 	}
 	defer resp.Body.Close()
+	if tok := resp.Header.Get("x-csrf-token"); tok != "" {
+		s.csrf = tok
+	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		s.setError(err)

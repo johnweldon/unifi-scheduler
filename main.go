@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,11 +24,13 @@ func main() {
 		log.Printf("Error:\n%v", err)
 		return
 	}
+	fmt.Fprintf(os.Stderr, "Initialized...\n")
 
 	if msg, err := ses.Login(); err != nil {
 		log.Printf("Login Error: (%s)\n%v", msg, err)
 		return
 	}
+	fmt.Fprintf(os.Stderr, "Logged in...\n")
 
 	u, err := ses.ListClients()
 	if err != nil {
