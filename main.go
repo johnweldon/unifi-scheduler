@@ -2,13 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 )
 
+var useJSON bool
+
+func init() {
+	flag.BoolVar(&useJSON, "json", useJSON, "output as json")
+}
+
 func main() {
+	flag.Parse()
+
 	_, invocation := filepath.Split(os.Args[0])
 
 	username := os.Getenv("UNIFI_USERNAME")
@@ -64,6 +73,13 @@ func main() {
 }
 
 func listFn(clients []Client, keys map[string]bool) {
+	if useJSON {
+		if err := json.NewEncoder(os.Stdout).Encode(clients); err != nil {
+			log.Printf("error encoding JSON: %v", err)
+		}
+		return
+	}
+
 	for _, client := range clients {
 		display := firstNonEmpty(client.Name, client.Hostname, "-")
 		ip := firstNonEmpty(client.FixedIP, client.IP)
