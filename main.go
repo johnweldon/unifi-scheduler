@@ -4,18 +4,23 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/johnweldon/unifi-scheduler/unifi"
 )
 
-var useJSON bool // nolint
+// nolint: gochecknoglobals
+var (
+	useJSON    bool
+	historical bool
+)
 
 // nolint
 func init() {
 	flag.BoolVar(&useJSON, "json", useJSON, "output as json")
+	flag.BoolVar(&historical, "historical", historical, "use historical data")
 }
 
 // nolint:funlen
@@ -35,31 +40,32 @@ func main() {
 	}
 
 	if err := ses.Initialize(); err != nil {
-		log.Printf("Error:\n%v", err)
+		fmt.Fprintf(os.Stderr, "Error:\n%v\n", err)
 
 		return
 	}
-
-	fmt.Fprintf(os.Stderr, "Initialized...\n")
 
 	if msg, err := ses.Login(); err != nil {
-		log.Printf("Login Error: (%s)\n%v", msg, err)
+		fmt.Fprintf(os.Stderr, "Login Error: (%s)\n%v\n", msg, err)
 
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Logged in...\n")
+	fetch := ses.ListClients
+	if historical || strings.Contains(invocation, "block") {
+		fetch = ses.ListUsers
+	}
 
-	u, err := ses.ListClients()
+	u, err := fetch()
 	if err != nil {
-		log.Printf("Error:\n%v", err)
+		fmt.Fprintf(os.Stderr, "Error:\n%v\n", err)
 
 		return
 	}
 
 	var users unifi.Response
 	if err := json.Unmarshal([]byte(u), &users); err != nil {
-		log.Printf("%s\n%v", u, err)
+		fmt.Fprintf(os.Stderr, "%s\n%v\n", u, err)
 
 		return
 	}
