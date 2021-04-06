@@ -13,6 +13,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -41,8 +42,8 @@ type Client struct {
 	Hostname            string `json:"hostname,omitempty"`
 	UsergroupID         string `json:"usergroup_id,omitempty"`
 	Name                string `json:"name,omitempty"`
-	FirstSeen           int    `json:"first_seen,omitempty"`
-	LastSeen            int    `json:"last_seen,omitempty"`
+	FirstSeen           int64  `json:"first_seen,omitempty"`
+	LastSeen            int64  `json:"last_seen,omitempty"`
 	DeviceIDOverride    int    `json:"dev_id_override,omitempty"`
 	FingerprintOverride bool   `json:"fingerprint_override,omitempty"`
 	Blocked             bool   `json:"blocked,omitempty"`
@@ -300,10 +301,26 @@ func (s *Session) ListFn(clients []Client, _ map[string]bool) {
 		return
 	}
 
+	now := time.Now().Unix()
+
+	sort.Slice(clients, func(i, j int) bool { return clients[i].LastSeen < clients[j].LastSeen })
+
+	const cutOff = 60 * 60 * 12 // 12 hours
 	for _, client := range clients {
-		display := firstNonEmpty(client.Name, client.Hostname, "-")
-		ip := firstNonEmpty(client.FixedIP, client.IP)
-		log.Printf("%30s %s %s", display, client.MAC, ip)
+		if (now - client.LastSeen) > cutOff {
+			continue
+		}
+
+		display := firstNonEmpty(client.Name, client.Hostname, client.MAC, "-")
+		ip := firstNonEmpty(client.IP, client.FixedIP)
+		lastSeen := time.Unix(client.LastSeen, 0)
+
+		guest := ""
+		if client.IsGuest {
+			guest = "✓"
+		}
+
+		log.Printf("%30s %2s %15s %s", display, guest, ip, lastSeen.Format(time.Kitchen))
 	}
 }
 
