@@ -11,7 +11,6 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
-	"sort"
 	"time"
 )
 
@@ -296,8 +295,6 @@ func (s *Session) ListFn(clients []Client, _ map[string]bool) {
 
 		return
 	}
-
-	sort.Slice(clients, func(i, j int) bool { return clients[i].LastSeen < clients[j].LastSeen })
 
 	for _, client := range clients {
 		fmt.Fprintf(s.outWriter, "%s\n", client.String())

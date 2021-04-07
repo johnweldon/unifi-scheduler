@@ -86,5 +86,7 @@ func main() {
 		fn = ses.ListFn
 	}
 
+	unifi.ClientDefault.Sort(users.Data)
+
 	fn(users.Data, target)
 }

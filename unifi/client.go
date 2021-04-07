@@ -2,7 +2,31 @@ package unifi
 
 import (
 	"fmt"
+	"sort"
 	"time"
+)
+
+var (
+	BytesReceived = func(lhs, rhs *Client) bool { return lhs.BytesReceived < rhs.BytesReceived }
+	BytesSent     = func(lhs, rhs *Client) bool { return lhs.BytesSent < rhs.BytesSent }
+	Confidence    = func(lhs, rhs *Client) bool { return lhs.Confidence < rhs.Confidence }
+	FirstSeen     = func(lhs, rhs *Client) bool { return lhs.FirstSeen < rhs.FirstSeen }
+	IP            = func(lhs, rhs *Client) bool { return lhs.IP < rhs.IP }
+	IdleTime      = func(lhs, rhs *Client) bool { return lhs.IdleTime < rhs.IdleTime }
+	IsAuthorized  = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
+	IsBlocked     = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
+	IsGuest       = func(lhs, rhs *Client) bool { return !lhs.IsGuest && rhs.IsGuest }
+	IsWired       = func(lhs, rhs *Client) bool { return !lhs.IsWired && rhs.IsWired }
+	LastSeen      = func(lhs, rhs *Client) bool { return lhs.LastSeen < rhs.LastSeen }
+	Name          = func(lhs, rhs *Client) bool { return lhs.Name < rhs.Name }
+	Network       = func(lhs, rhs *Client) bool { return lhs.Network < rhs.Network }
+	Noise         = func(lhs, rhs *Client) bool { return lhs.Noise < rhs.Noise }
+	Satisfaction  = func(lhs, rhs *Client) bool { return lhs.Satisfaction < rhs.Satisfaction }
+	Score         = func(lhs, rhs *Client) bool { return lhs.Score < rhs.Score }
+	Signal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
+	Uptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
+
+	ClientDefault = OrderedBy(IsAuthorized, IsGuest, IsWired, IP)
 )
 
 // Client describes a UniFi network client.
@@ -148,4 +172,41 @@ func (client *Client) String() string {
 		uptime,
 		traffic,
 	)
+}
+
+// OrderedBy returns a ClientSorter that sorts by the provided less functions.
+func OrderedBy(less ...ClientLessFn) *ClientSorter {
+	return &ClientSorter{less: less}
+}
+
+// ClientLessFn describes a less function for a Client.
+type ClientLessFn func(lhs, rhs *Client) bool
+
+// ClientSorter is a multisorter for sorting slices of Client.
+type ClientSorter struct {
+	clients []Client
+	less    []ClientLessFn
+}
+
+// Sort applies the configured less functions in order.
+func (s *ClientSorter) Sort(clients []Client) {
+	s.clients = clients
+	sort.Sort(s)
+}
+
+func (s *ClientSorter) Len() int      { return len(s.clients) }
+func (s *ClientSorter) Swap(i, j int) { s.clients[i], s.clients[j] = s.clients[j], s.clients[i] }
+func (s *ClientSorter) Less(i, j int) bool {
+	lhs, rhs := &s.clients[i], &s.clients[j]
+	var k int
+	for k = 0; k < len(s.less)-1; k++ {
+		less := s.less[k]
+		switch {
+		case less(lhs, rhs):
+			return true
+		case less(rhs, lhs):
+			return false
+		}
+	}
+	return s.less[k](lhs, rhs)
 }
