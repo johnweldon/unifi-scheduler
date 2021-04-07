@@ -299,4 +299,6 @@ func (s *Session) ListFn(clients []Client, _ map[string]bool) {
 	for _, client := range clients {
 		fmt.Fprintf(s.outWriter, "%s\n", client.String())
 	}
+
+  fmt.Fprintf(s.outWriter, "%d clients\n", len(clients))
 }
