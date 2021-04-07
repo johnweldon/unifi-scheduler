@@ -132,12 +132,20 @@ func (client *Client) String() string {
 		uptime = time.Unix(client.LastSeen, 0).Format(time.RFC3339)
 	}
 
-	return fmt.Sprintf("%20s %-2s %-2s %-2s %-15s %s",
+	traffic := ""
+	if client.BytesReceived+client.BytesSent > 0 {
+		recvd := formatBytesSize(client.BytesReceived)
+		sent := formatBytesSize(client.BytesSent)
+		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
+	}
+
+	return fmt.Sprintf("%20s %-2s %-2s %-2s %-15s %-10s %s",
 		display,
 		blocked,
 		guest,
 		wired,
 		ip,
 		uptime,
+		traffic,
 	)
 }
