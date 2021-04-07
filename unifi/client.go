@@ -26,7 +26,8 @@ var (
 	Signal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
 	Uptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
-	ClientDefault = OrderedBy(IsAuthorized, IsGuest, IsWired, IP)
+	ClientDefault    = OrderedBy(IsAuthorized, IsGuest, IsWired, IP)
+	ClientHistorical = OrderedBy(Name, LastSeen)
 )
 
 // Client describes a UniFi network client.
@@ -163,7 +164,7 @@ func (client *Client) String() string {
 		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
 	}
 
-	return fmt.Sprintf("%20s %-2s %-2s %-2s %-15s %-10s %s",
+	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-10s %s",
 		display,
 		blocked,
 		guest,

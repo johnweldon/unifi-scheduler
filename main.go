@@ -51,8 +51,11 @@ func main() {
 		return
 	}
 
+	sorter := unifi.ClientDefault
 	fetch := ses.ListClients
+
 	if historical || strings.Contains(invocation, "block") {
+		sorter = unifi.ClientHistorical
 		fetch = ses.ListUsers
 	}
 
@@ -86,7 +89,7 @@ func main() {
 		fn = ses.ListFn
 	}
 
-	unifi.ClientDefault.Sort(users.Data)
+	sorter.Sort(users.Data)
 
 	fn(users.Data, target)
 }
