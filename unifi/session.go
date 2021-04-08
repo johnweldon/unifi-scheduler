@@ -3,7 +3,6 @@ package unifi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,7 +18,6 @@ type Session struct {
 	Endpoint string
 	Username string
 	Password string
-	UseJSON  bool
 	csrf     string
 	client   *http.Client
 	login    func() (string, error)
@@ -122,6 +120,22 @@ func (s *Session) ListClients() (string, error) {
 	return s.get(u)
 }
 
+// ListDevices describes currently connected clients.
+func (s *Session) ListDevices() (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+
+	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/stat/device", s.Endpoint))
+	if err != nil {
+		s.setError(err)
+
+		return "", s.err
+	}
+
+	return s.get(u)
+}
+
 // Kick disconnects a connected client, identified by MAC address.
 func (s *Session) Kick(mac string) (string, error) {
 	return s.macAction("kick-sta", mac)
@@ -195,7 +209,7 @@ func (s *Session) webLogin() (string, error) {
 	return respBody, err
 }
 
-func (s *Session) macAction(action string, mac string) (string, error) {
+func (s *Session) macAction(action, mac string) (string, error) {
 	if b, err := s.login(); err != nil {
 		return b, err
 	}
@@ -285,20 +299,4 @@ func (s *Session) setErrorString(e string) {
 	} else {
 		s.err = fmt.Errorf("%s\n%w", e, s.err)
 	}
-}
-
-func (s *Session) ListFn(clients []Client, _ map[string]bool) {
-	if s.UseJSON {
-		if err := json.NewEncoder(os.Stdout).Encode(clients); err != nil {
-			fmt.Fprintf(s.errWriter, "error encoding JSON: %v\n", err)
-		}
-
-		return
-	}
-
-	for _, client := range clients {
-		fmt.Fprintf(s.outWriter, "%s\n", client.String())
-	}
-
-  fmt.Fprintf(s.outWriter, "%d clients\n", len(clients))
 }

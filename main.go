@@ -23,7 +23,6 @@ func init() {
 	flag.BoolVar(&historical, "historical", historical, "use historical data")
 }
 
-// nolint:funlen
 func main() {
 	flag.Parse()
 
@@ -36,7 +35,6 @@ func main() {
 		Username: username,
 		Password: password,
 		Endpoint: endpoint,
-		UseJSON:  useJSON,
 	}
 
 	if err := ses.Initialize(); err != nil {
@@ -51,24 +49,16 @@ func main() {
 		return
 	}
 
-	sorter := unifi.ClientDefault
-	fetch := ses.ListClients
-
-	if historical || strings.Contains(invocation, "block") {
-		sorter = unifi.ClientHistorical
-		fetch = ses.ListUsers
-	}
-
-	u, err := fetch()
+	devices, err := getDevices(ses)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error:\n%v\n", err)
 
 		return
 	}
 
-	var users unifi.Response
-	if err := json.Unmarshal([]byte(u), &users); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n%v\n", u, err)
+	clients, err := getClients(ses, invocation)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error:\n%v\n", err)
 
 		return
 	}
@@ -79,17 +69,81 @@ func main() {
 	}
 
 	functions := map[string]func([]unifi.Client, map[string]bool){
-		"list":    ses.ListFn,
+		"list":    listFunction(devices, useJSON),
 		"block":   ses.BlockFn,
 		"unblock": ses.UnblockFn,
 	}
 
 	fn, ok := functions[invocation]
 	if !ok {
-		fn = ses.ListFn
+		fn = functions["list"]
+	}
+
+	fn(clients, target)
+}
+
+func getClients(ses *unifi.Session, mode string) ([]unifi.Client, error) {
+	sorter := unifi.ClientDefault
+	fetch := ses.ListClients
+
+	if historical || strings.Contains(mode, "block") {
+		sorter = unifi.ClientHistorical
+		fetch = ses.ListUsers
+	}
+
+	u, err := fetch()
+	if err != nil {
+		return nil, err
+	}
+
+	var users unifi.ClientResponse
+	if err := json.Unmarshal([]byte(u), &users); err != nil {
+		return nil, err // nolint: wrapcheck
 	}
 
 	sorter.Sort(users.Data)
 
-	fn(users.Data, target)
+	return users.Data, nil
+}
+
+func getDevices(ses *unifi.Session) (map[string]unifi.Device, error) {
+	d, err := ses.ListDevices()
+	if err != nil {
+		return nil, err // nolint: wrapcheck
+	}
+
+	var devices unifi.DeviceResponse
+	if err := json.Unmarshal([]byte(d), &devices); err != nil {
+		return nil, err // nolint: wrapcheck
+	}
+
+	dmap := map[string]unifi.Device{}
+	for _, device := range devices.Data {
+		dmap[string(device.MAC)] = device
+	}
+
+	return dmap, nil
+}
+
+func listFunction(devices map[string]unifi.Device, useJSON bool) func([]unifi.Client, map[string]bool) {
+	return func(clients []unifi.Client, _ map[string]bool) {
+		if useJSON {
+			if err := json.NewEncoder(os.Stdout).Encode(clients); err != nil {
+				fmt.Fprintf(os.Stderr, "error encoding JSON: %v\n", err)
+			}
+
+			return
+		}
+
+		for _, client := range clients {
+			ap := ""
+			if dev, ok := devices[client.AccessPointMAC]; ok {
+				ap = fmt.Sprintf(" %s", dev.Name)
+			}
+
+			fmt.Fprintf(os.Stdout, "%s%s\n", client.String(), ap)
+		}
+
+		fmt.Fprintf(os.Stdout, "%d clients\n", len(clients))
+	}
 }

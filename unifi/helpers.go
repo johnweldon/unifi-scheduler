@@ -11,7 +11,7 @@ var (
 )
 
 // nolint: unused,gomnd
-func round(val float64, roundOn float64, places int) float64 {
+func round(val, roundOn float64, places int) float64 {
 	var round float64
 
 	pow := math.Pow(10, float64(places))

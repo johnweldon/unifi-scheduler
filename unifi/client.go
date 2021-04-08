@@ -11,7 +11,7 @@ var (
 	BytesSent     = func(lhs, rhs *Client) bool { return lhs.BytesSent < rhs.BytesSent }
 	Confidence    = func(lhs, rhs *Client) bool { return lhs.Confidence < rhs.Confidence }
 	FirstSeen     = func(lhs, rhs *Client) bool { return lhs.FirstSeen < rhs.FirstSeen }
-	IP            = func(lhs, rhs *Client) bool { return lhs.IP < rhs.IP }
+	IPAddress     = func(lhs, rhs *Client) bool { return lhs.IP < rhs.IP }
 	IdleTime      = func(lhs, rhs *Client) bool { return lhs.IdleTime < rhs.IdleTime }
 	IsAuthorized  = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
 	IsBlocked     = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
@@ -26,7 +26,7 @@ var (
 	Signal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
 	Uptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
-	ClientDefault    = OrderedBy(IsAuthorized, IsGuest, IsWired, IP)
+	ClientDefault    = OrderedBy(IsAuthorized, IsGuest, IsWired, IPAddress)
 	ClientHistorical = OrderedBy(Name, LastSeen)
 )
 
