@@ -11,7 +11,7 @@ var (
 	BytesSent     = func(lhs, rhs *Client) bool { return lhs.BytesSent < rhs.BytesSent }
 	Confidence    = func(lhs, rhs *Client) bool { return lhs.Confidence < rhs.Confidence }
 	FirstSeen     = func(lhs, rhs *Client) bool { return lhs.FirstSeen < rhs.FirstSeen }
-	IPAddress     = func(lhs, rhs *Client) bool { return lhs.IP < rhs.IP }
+	IPAddress     = func(lhs, rhs *Client) bool { return lhs.IP.Less(rhs.IP) }
 	IdleTime      = func(lhs, rhs *Client) bool { return lhs.IdleTime < rhs.IdleTime }
 	IsAuthorized  = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
 	IsBlocked     = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
@@ -26,7 +26,7 @@ var (
 	Signal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
 	Uptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
-	ClientDefault    = OrderedBy(IsAuthorized, IsGuest, IsWired, IPAddress)
+	ClientDefault    = OrderedBy(IPAddress)
 	ClientHistorical = OrderedBy(Name, LastSeen)
 )
 
@@ -39,10 +39,10 @@ type Client struct {
 	DeviceName      string `json:"device_name,omitempty"`
 	ESSID           string `json:"essid,omitempty"`
 	FirmwareVersion string `json:"fw_version,omitempty"`
-	FixedIP         string `json:"fixed_ip,omitempty"`
+	FixedIP         IP     `json:"fixed_ip,omitempty"`
 	GatewayMAC      string `json:"gw_mac,omitempty"`
 	Hostname        string `json:"hostname,omitempty"`
-	IP              string `json:"ip,omitempty"`
+	IP              IP     `json:"ip,omitempty"`
 	MAC             string `json:"mac,omitempty"`
 	Name            string `json:"name,omitempty"`
 	Network         string `json:"network,omitempty"`
@@ -135,7 +135,7 @@ type Client struct {
 
 func (client *Client) String() string {
 	display := firstNonEmpty(client.Name, client.Hostname, client.DeviceName, client.OUI, client.MAC, "-")
-	ip := firstNonEmpty(client.IP, client.FixedIP)
+	ip := firstNonEmpty(string(client.IP), string(client.FixedIP))
 
 	blocked := ""
 	if client.IsBlocked {

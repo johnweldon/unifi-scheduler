@@ -1,5 +1,7 @@
 package unifi
 
+import "net"
+
 type (
 	Duration              int64
 	TimeStamp             int64
@@ -8,6 +10,39 @@ type (
 	MAC                   string
 	IP                    string
 )
+
+func (lhs IP) Less(rhs IP) bool {
+	if len(rhs) == 0 {
+		return false
+	}
+
+	if len(lhs) == 0 {
+		return true
+	}
+
+	lip := net.ParseIP(string(lhs))
+	rip := net.ParseIP(string(rhs))
+
+	if len(rip) < len(lip) {
+		return false
+	}
+
+	if len(lip) < len(rip) {
+		return true
+	}
+
+	for ix := 0; ix < len(lip); ix++ {
+		if rip[ix] < lip[ix] {
+			return false
+		}
+
+		if lip[ix] < rip[ix] {
+			return true
+		}
+	}
+
+	return false
+}
 
 // Device describes unifi managed device.
 type Device struct {
