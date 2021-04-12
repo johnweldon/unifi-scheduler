@@ -141,7 +141,7 @@ func listFunction(devices map[string]unifi.Device, useJSON bool) func([]unifi.Cl
 				ap = fmt.Sprintf(" %s", dev.Name)
 			}
 
-			fmt.Fprintf(os.Stdout, "%s%s\n", client.String(), ap)
+			fmt.Fprintf(os.Stdout, "%-95s%s\n", client.String(), ap)
 		}
 
 		fmt.Fprintf(os.Stdout, "%d clients\n", len(clients))

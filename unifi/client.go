@@ -164,7 +164,7 @@ func (client *Client) String() string {
 		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
 	}
 
-	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-10s %s",
+	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-14s %s",
 		display,
 		blocked,
 		guest,
