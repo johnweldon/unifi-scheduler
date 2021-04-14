@@ -1,48 +1,18 @@
 package unifi
 
-import "net"
-
-type (
-	Duration              int64
-	TimeStamp             int64
-	DurationMilliseconds  int64
-	TimeStampMilliseconds int64
-	MAC                   string
-	IP                    string
+import (
+	"fmt"
+	"sort"
+	"strconv"
 )
 
-func (lhs IP) Less(rhs IP) bool {
-	if len(rhs) == 0 {
-		return false
-	}
+var (
+	DeviceBytesReceived = func(lhs, rhs *Device) bool { return lhs.BytesReceived < rhs.BytesReceived }
+	DeviceBytesSent     = func(lhs, rhs *Device) bool { return lhs.BytesSent < rhs.BytesSent }
+	DeviceIP            = func(lhs, rhs *Device) bool { return lhs.IP.Less(rhs.IP) }
 
-	if len(lhs) == 0 {
-		return true
-	}
-
-	lip := net.ParseIP(string(lhs))
-	rip := net.ParseIP(string(rhs))
-
-	if len(rip) < len(lip) {
-		return false
-	}
-
-	if len(lip) < len(rip) {
-		return true
-	}
-
-	for ix := 0; ix < len(lip); ix++ {
-		if rip[ix] < lip[ix] {
-			return false
-		}
-
-		if lip[ix] < rip[ix] {
-			return true
-		}
-	}
-
-	return false
-}
+	DeviceDefault = DeviceOrderedBy(DeviceIP)
+)
 
 // Device describes unifi managed device.
 type Device struct {
@@ -109,9 +79,9 @@ type Device struct {
 	StartDisconnected TimeStampMilliseconds `json:"start_disconnected_millis,omitempty"`
 	Uptime            Duration              `json:"uptime,omitempty"`
 
-	Bytes        int64 `json:"bytes,omitempty"`
-	ReceiveBytes int64 `json:"rx_bytes,omitempty"`
-	SendBytes    int64 `json:"tx_bytes,omitempty"`
+	Bytes         int64 `json:"bytes,omitempty"`
+	BytesReceived int64 `json:"rx_bytes,omitempty"`
+	BytesSent     int64 `json:"tx_bytes,omitempty"`
 
 	Anomalies                  int `json:"anomalies,omitempty"`
 	BoardRevision              int `json:"board_rev,omitempty"`
@@ -153,6 +123,22 @@ type Device struct {
 	LCMIdleTimeoutOverride   bool `json:"lcm_idle_timeout_override,omitempty"`
 	RollUpgrade              bool `json:"rollupgrade,omitempty"`
 	XHasSSHHostKey           bool `json:"x_has_ssh_hostkey,omitempty"`
+}
+
+func (d *Device) String() string {
+	traffic := ""
+	if d.BytesReceived+d.BytesSent > 0 {
+		recvd := formatBytesSize(d.BytesReceived)
+		sent := formatBytesSize(d.BytesSent)
+		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
+	}
+
+	temp := ""
+	if d.HasTemperature {
+		temp = fmt.Sprintf("%d°C", d.GeneralTemperature)
+	}
+
+	return fmt.Sprintf("%25s   %-15s %-4s %-35s %s", d.Name, d.IP, temp, d.SystemStats, traffic)
 }
 
 type ConfigNetwork struct {
@@ -290,6 +276,18 @@ type SystemStats struct {
 	Uptime string `json:"uptime,omitempty"`
 }
 
+func (s SystemStats) String() string {
+	if len(s.CPU)+len(s.Mem)+len(s.Uptime) == 0 {
+		return ""
+	}
+
+	uptime := ""
+	if u, err := strconv.ParseInt(s.Uptime, 10, 64); err == nil {
+		uptime = Duration(u).String()
+	}
+	return fmt.Sprintf("%4s%% cpu / %-4s%% mem  %s", s.CPU, s.Mem, uptime)
+}
+
 type SSHSession struct{}
 
 type DHCPServer struct{}
@@ -370,4 +368,41 @@ type Stat struct {
 	   port_4-rx_multicast int64 `json:"port_4-rx_multicast,omitempty"`
 	   port_4-rx_broadcast int64 `json:"port_4-rx_broadcast,omitempty"`
 	*/
+}
+
+// DeviceOrderedBy returns a DeviceSorter that sorts by the provided less functions.
+func DeviceOrderedBy(less ...DeviceLessFn) *DeviceSorter {
+	return &DeviceSorter{less: less}
+}
+
+// DeviceLessFn describes a less function for a Device.
+type DeviceLessFn func(lhs, rhs *Device) bool
+
+// DeviceSorter is a multisorter for sorting slices of Device.
+type DeviceSorter struct {
+	devices []Device
+	less    []DeviceLessFn
+}
+
+// Sort applies the configured less functions in order.
+func (s *DeviceSorter) Sort(clients []Device) {
+	s.devices = clients
+	sort.Sort(s)
+}
+
+func (s *DeviceSorter) Len() int      { return len(s.devices) }
+func (s *DeviceSorter) Swap(i, j int) { s.devices[i], s.devices[j] = s.devices[j], s.devices[i] }
+func (s *DeviceSorter) Less(i, j int) bool {
+	lhs, rhs := &s.devices[i], &s.devices[j]
+	var k int
+	for k = 0; k < len(s.less)-1; k++ {
+		less := s.less[k]
+		switch {
+		case less(lhs, rhs):
+			return true
+		case less(rhs, lhs):
+			return false
+		}
+	}
+	return s.less[k](lhs, rhs)
 }

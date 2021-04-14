@@ -70,6 +70,7 @@ func main() {
 
 	functions := map[string]func([]unifi.Client, map[string]bool){
 		"list":    listFunction(devices, useJSON),
+		"devices": listDevices(devices, useJSON),
 		"block":   ses.BlockFn,
 		"unblock": ses.UnblockFn,
 	}
@@ -137,7 +138,8 @@ func listFunction(devices map[string]unifi.Device, useJSON bool) func([]unifi.Cl
 
 		for _, client := range clients {
 			ap := ""
-			if dev, ok := devices[client.AccessPointMAC]; ok {
+
+			if dev, ok := devices[client.UpstreamMAC()]; ok {
 				ap = fmt.Sprintf(" %s", dev.Name)
 			}
 
@@ -145,5 +147,29 @@ func listFunction(devices map[string]unifi.Device, useJSON bool) func([]unifi.Cl
 		}
 
 		fmt.Fprintf(os.Stdout, "%d clients\n", len(clients))
+	}
+}
+
+func listDevices(devices map[string]unifi.Device, useJSON bool) func([]unifi.Client, map[string]bool) {
+	deviceList := make([]unifi.Device, 0, len(devices))
+
+	for _, device := range devices {
+		deviceList = append(deviceList, device)
+	}
+
+	unifi.DeviceDefault.Sort(deviceList)
+
+	return func(_ []unifi.Client, _ map[string]bool) {
+		if useJSON {
+			if err := json.NewEncoder(os.Stdout).Encode(devices); err != nil {
+				fmt.Fprintf(os.Stderr, "error encoding JSON: %v\n", err)
+			}
+
+			return
+		}
+
+		for _, device := range deviceList {
+			fmt.Fprintf(os.Stdout, "%s\n", device.String())
+		}
 	}
 }

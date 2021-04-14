@@ -3,7 +3,53 @@ package unifi
 import (
 	"fmt"
 	"math"
+	"net"
+	"time"
 )
+
+type (
+	Duration              int64
+	TimeStamp             int64
+	DurationMilliseconds  int64
+	TimeStampMilliseconds int64
+	MAC                   string
+	IP                    string
+)
+
+func (d Duration) String() string { return (time.Second * time.Duration(d)).String() }
+
+func (lhs IP) Less(rhs IP) bool {
+	if len(rhs) == 0 {
+		return false
+	}
+
+	if len(lhs) == 0 {
+		return true
+	}
+
+	lip := net.ParseIP(string(lhs))
+	rip := net.ParseIP(string(rhs))
+
+	if len(rip) < len(lip) {
+		return false
+	}
+
+	if len(lip) < len(rip) {
+		return true
+	}
+
+	for ix := 0; ix < len(lip); ix++ {
+		if rip[ix] < lip[ix] {
+			return false
+		}
+
+		if lip[ix] < rip[ix] {
+			return true
+		}
+	}
+
+	return false
+}
 
 // nolint: gochecknoglobals,unused
 var (

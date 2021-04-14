@@ -7,27 +7,27 @@ import (
 )
 
 var (
-	BytesReceived = func(lhs, rhs *Client) bool { return lhs.BytesReceived < rhs.BytesReceived }
-	BytesSent     = func(lhs, rhs *Client) bool { return lhs.BytesSent < rhs.BytesSent }
-	Confidence    = func(lhs, rhs *Client) bool { return lhs.Confidence < rhs.Confidence }
-	FirstSeen     = func(lhs, rhs *Client) bool { return lhs.FirstSeen < rhs.FirstSeen }
-	IPAddress     = func(lhs, rhs *Client) bool { return lhs.IP.Less(rhs.IP) }
-	IdleTime      = func(lhs, rhs *Client) bool { return lhs.IdleTime < rhs.IdleTime }
-	IsAuthorized  = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
-	IsBlocked     = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
-	IsGuest       = func(lhs, rhs *Client) bool { return !lhs.IsGuest && rhs.IsGuest }
-	IsWired       = func(lhs, rhs *Client) bool { return !lhs.IsWired && rhs.IsWired }
-	LastSeen      = func(lhs, rhs *Client) bool { return lhs.LastSeen < rhs.LastSeen }
-	Name          = func(lhs, rhs *Client) bool { return lhs.Name < rhs.Name }
-	Network       = func(lhs, rhs *Client) bool { return lhs.Network < rhs.Network }
-	Noise         = func(lhs, rhs *Client) bool { return lhs.Noise < rhs.Noise }
-	Satisfaction  = func(lhs, rhs *Client) bool { return lhs.Satisfaction < rhs.Satisfaction }
-	Score         = func(lhs, rhs *Client) bool { return lhs.Score < rhs.Score }
-	Signal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
-	Uptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
+	ClientBytesReceived = func(lhs, rhs *Client) bool { return lhs.BytesReceived < rhs.BytesReceived }
+	ClientBytesSent     = func(lhs, rhs *Client) bool { return lhs.BytesSent < rhs.BytesSent }
+	ClientConfidence    = func(lhs, rhs *Client) bool { return lhs.Confidence < rhs.Confidence }
+	ClientFirstSeen     = func(lhs, rhs *Client) bool { return lhs.FirstSeen < rhs.FirstSeen }
+	ClientIP            = func(lhs, rhs *Client) bool { return lhs.IP.Less(rhs.IP) }
+	ClientIdle          = func(lhs, rhs *Client) bool { return lhs.IdleTime < rhs.IdleTime }
+	ClientAuthorized    = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
+	ClientBlocked       = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
+	ClientGuest         = func(lhs, rhs *Client) bool { return !lhs.IsGuest && rhs.IsGuest }
+	ClientWired         = func(lhs, rhs *Client) bool { return !lhs.IsWired && rhs.IsWired }
+	ClientLastSeen      = func(lhs, rhs *Client) bool { return lhs.LastSeen < rhs.LastSeen }
+	ClientName          = func(lhs, rhs *Client) bool { return lhs.Name < rhs.Name }
+	ClientNetwork       = func(lhs, rhs *Client) bool { return lhs.Network < rhs.Network }
+	ClientNoise         = func(lhs, rhs *Client) bool { return lhs.Noise < rhs.Noise }
+	ClientSatisfaction  = func(lhs, rhs *Client) bool { return lhs.Satisfaction < rhs.Satisfaction }
+	ClientScore         = func(lhs, rhs *Client) bool { return lhs.Score < rhs.Score }
+	ClientSignal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
+	ClientUptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
-	ClientDefault    = OrderedBy(IPAddress)
-	ClientHistorical = OrderedBy(Name, LastSeen)
+	ClientDefault    = ClientOrderedBy(ClientIP)
+	ClientHistorical = ClientOrderedBy(ClientName, ClientLastSeen)
 )
 
 // Client describes a UniFi network client.
@@ -175,8 +175,12 @@ func (client *Client) String() string {
 	)
 }
 
-// OrderedBy returns a ClientSorter that sorts by the provided less functions.
-func OrderedBy(less ...ClientLessFn) *ClientSorter {
+func (client *Client) UpstreamMAC() string {
+	return firstNonEmpty(client.AccessPointMAC, client.SwitchMAC, client.GatewayMAC)
+}
+
+// ClientOrderedBy returns a ClientSorter that sorts by the provided less functions.
+func ClientOrderedBy(less ...ClientLessFn) *ClientSorter {
 	return &ClientSorter{less: less}
 }
 
