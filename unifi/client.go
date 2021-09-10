@@ -43,7 +43,7 @@ type Client struct {
 	GatewayMAC      string `json:"gw_mac,omitempty"`
 	Hostname        string `json:"hostname,omitempty"`
 	IP              IP     `json:"ip,omitempty"`
-	MAC             string `json:"mac,omitempty"`
+	MAC             MAC    `json:"mac,omitempty"`
 	Name            string `json:"name,omitempty"`
 	Network         string `json:"network,omitempty"`
 	NetworkID       string `json:"network_id,omitempty"`
@@ -131,10 +131,14 @@ type Client struct {
 	IsUSWGuest         bool `json:"_is_guest_by_usw,omitempty"`
 	IsWired            bool `json:"is_wired,omitempty"`
 	UseFixedIP         bool `json:"use_fixedip,omitempty"`
+
+	// Synthetic fields
+
+	UpstreamName string `json:"upstream_name,omitempty"`
 }
 
 func (client *Client) String() string {
-	display := firstNonEmpty(client.Name, client.Hostname, client.DeviceName, client.OUI, client.MAC, "-")
+	display := firstNonEmpty(client.Name, client.Hostname, client.DeviceName, client.OUI, string(client.MAC), "-")
 	ip := firstNonEmpty(string(client.IP), string(client.FixedIP))
 
 	blocked := ""
@@ -164,7 +168,12 @@ func (client *Client) String() string {
 		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
 	}
 
-	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-14s %s",
+	upstream := ""
+	if len(client.UpstreamName) > 0 {
+		upstream = fmt.Sprintf(" %s", client.UpstreamName)
+	}
+
+	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-14s %s %s",
 		display,
 		blocked,
 		guest,
@@ -172,6 +181,7 @@ func (client *Client) String() string {
 		ip,
 		uptime,
 		traffic,
+		upstream,
 	)
 }
 

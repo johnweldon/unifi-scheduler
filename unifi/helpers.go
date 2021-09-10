@@ -51,12 +51,12 @@ func (lhs IP) Less(rhs IP) bool {
 	return false
 }
 
-// nolint: gochecknoglobals,unused
+// nolint: gochecknoglobals
 var (
 	suffixes = []string{"B", "KB", "MB", "GB", "TB"}
 )
 
-// nolint: unused,gomnd
+// nolint: gomnd
 func round(val, roundOn float64, places int) float64 {
 	var round float64
 
@@ -72,7 +72,7 @@ func round(val, roundOn float64, places int) float64 {
 	return round / pow
 }
 
-// nolint: deadcode,unused,gomnd
+// nolint: gomnd
 func formatBytesSize(size int64) string {
 	if size <= 0 {
 		return "0 B"
@@ -85,7 +85,6 @@ func formatBytesSize(size int64) string {
 	return fmt.Sprintf("%.2f %s", rounded, suffix)
 }
 
-// nolint: deadcode,unused
 func firstNonEmpty(s ...string) string {
 	for _, candidate := range s {
 		if len(candidate) > 0 {

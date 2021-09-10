@@ -3,6 +3,7 @@ package unifi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,10 +19,11 @@ type Session struct {
 	Endpoint string
 	Username string
 	Password string
-	csrf     string
-	client   *http.Client
-	login    func() (string, error)
-	err      error
+
+	csrf   string
+	client *http.Client
+	login  func() (string, error)
+	err    error
 
 	outWriter io.Writer
 	errWriter io.Writer
@@ -88,6 +90,164 @@ func (s *Session) Login() (string, error) {
 	return s.login()
 }
 
+func (s *Session) GetDevices() ([]Device, error) {
+	var (
+		devices []Device
+		dmap    map[string]Device
+
+		err error
+	)
+
+	if dmap, err = s.getDevices(); err != nil {
+		return nil, fmt.Errorf("getting devices: %w", err)
+	}
+
+	for _, device := range dmap {
+		devices = append(devices, device)
+	}
+
+	DeviceDefault.Sort(devices)
+
+	return devices, nil
+}
+
+func (s *Session) GetClients() ([]Client, error) {
+	return s.getClients(false)
+}
+
+func (s *Session) GetUsers() ([]Client, error) {
+	return s.getClients(true)
+}
+
+func (s *Session) GetNames() (map[string]MAC, error) {
+	var (
+		names = map[string]MAC{}
+
+		devices []Device
+		clients []Client
+		users   []Client
+
+		err error
+	)
+
+	if devices, err = s.GetDevices(); err != nil {
+		return nil, fmt.Errorf("getting devices: %w", err)
+	}
+
+	for _, device := range devices {
+		for _, name := range []string{
+			device.Name,
+			string(device.IP),
+			string(device.MAC),
+		} {
+			if len(name) == 0 {
+				continue
+			}
+
+			if _, ok := names[name]; !ok {
+				names[name] = device.MAC
+			}
+		}
+	}
+
+	if clients, err = s.GetClients(); err != nil {
+		return nil, fmt.Errorf("getting users: %w", err)
+	}
+
+	if users, err = s.GetUsers(); err != nil {
+		return nil, fmt.Errorf("getting users: %w", err)
+	}
+
+	for _, user := range append(clients, users...) {
+		for _, name := range []string{
+			user.Name,
+			user.Hostname,
+			user.DeviceName,
+			string(user.IP),
+			string(user.FixedIP),
+			string(user.MAC),
+		} {
+			if len(name) == 0 {
+				continue
+			}
+
+			if _, ok := names[name]; !ok {
+				names[name] = user.MAC
+			}
+		}
+	}
+
+	return names, nil
+}
+
+func (s *Session) getClients(all bool) ([]Client, error) {
+	var (
+		devices map[string]Device
+
+		clientsJSON string
+		clients     []Client
+		cresp       ClientResponse
+
+		err error
+	)
+
+	sorter := ClientDefault
+	fetch := s.ListClients
+
+	if all {
+		sorter = ClientHistorical
+		fetch = s.ListUsers
+	}
+
+	if devices, err = s.getDevices(); err != nil {
+		return nil, fmt.Errorf("getting devices: %w", err)
+	}
+
+	if clientsJSON, err = fetch(); err != nil {
+		return nil, fmt.Errorf("listing clients: %w", err)
+	}
+
+	if err = json.Unmarshal([]byte(clientsJSON), &cresp); err != nil {
+		return nil, fmt.Errorf("unmarshaling clients: %w", err)
+	}
+
+	for _, client := range cresp.Data {
+		if dev, ok := devices[client.UpstreamMAC()]; ok {
+			client.UpstreamName = dev.Name
+		}
+
+		clients = append(clients, client)
+	}
+
+	sorter.Sort(clients)
+
+	return clients, nil
+}
+
+func (s *Session) getDevices() (map[string]Device, error) {
+	var (
+		devicesJSON string
+		devices     = map[string]Device{}
+		dresp       DeviceResponse
+
+		err error
+	)
+
+	if devicesJSON, err = s.ListDevices(); err != nil {
+		return nil, fmt.Errorf("listing devices: %w", err)
+	}
+
+	if err = json.Unmarshal([]byte(devicesJSON), &dresp); err != nil {
+		return nil, fmt.Errorf("unmarshaling devices: %w", err)
+	}
+
+	for _, device := range dresp.Data {
+		devices[string(device.MAC)] = device
+	}
+
+	return devices, nil
+}
+
 // ListUsers describes the known UniFi clients.
 func (s *Session) ListUsers() (string, error) {
 	if s.err != nil {
@@ -137,18 +297,18 @@ func (s *Session) ListDevices() (string, error) {
 }
 
 // Kick disconnects a connected client, identified by MAC address.
-func (s *Session) Kick(mac string) (string, error) {
+func (s *Session) Kick(mac MAC) (string, error) {
 	return s.macAction("kick-sta", mac)
 }
 
 // Block prevents a specific client (identified by MAC) from connecting
 // to the UniFi network.
-func (s *Session) Block(mac string) (string, error) {
+func (s *Session) Block(mac MAC) (string, error) {
 	return s.macAction("block-sta", mac)
 }
 
 // Unblock re-enables a specific client.
-func (s *Session) Unblock(mac string) (string, error) {
+func (s *Session) Unblock(mac MAC) (string, error) {
 	return s.macAction("unblock-sta", mac)
 }
 
@@ -209,7 +369,7 @@ func (s *Session) webLogin() (string, error) {
 	return respBody, err
 }
 
-func (s *Session) macAction(action, mac string) (string, error) {
+func (s *Session) macAction(action, mac MAC) (string, error) {
 	if b, err := s.login(); err != nil {
 		return b, err
 	}
