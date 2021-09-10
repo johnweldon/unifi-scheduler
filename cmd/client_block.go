@@ -17,11 +17,13 @@ var blockCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		for _, victim := range args {
-			if mac, ok := names[victim]; ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "blocking %q (%s) ... ", victim, mac)
-				_, err := ses.Block(mac)
-				cobra.CheckErr(err)
-				fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
+			if macs, ok := names[victim]; ok {
+				for _, mac := range macs {
+					fmt.Fprintf(cmd.OutOrStdout(), "blocking %q (%s) ... ", victim, mac)
+					_, err := ses.Block(mac)
+					cobra.CheckErr(err)
+					fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
+				}
 			}
 		}
 	},

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,8 +24,8 @@ var eventConnectionsCmd = &cobra.Command{
 
 		for _, event := range events {
 			var (
-				name string
-				ok   bool
+				names []string
+				ok    bool
 			)
 
 			for _, mac := range []unifi.MAC{
@@ -32,8 +33,9 @@ var eventConnectionsCmd = &cobra.Command{
 				event.Client,
 				event.Guest,
 			} {
-				if name, ok = macs[mac]; ok {
-					fmt.Fprintf(cmd.OutOrStdout(), "%40s  %-25s  %s\n", name, event.Key, event.TimeStamp)
+				if names, ok = macs[mac]; ok {
+					name := strings.Join(names, ", ")
+					fmt.Fprintf(cmd.OutOrStdout(), "%50s  %-25s  %s\n", name, event.Key, event.TimeStamp)
 				}
 			}
 		}

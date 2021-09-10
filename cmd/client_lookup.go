@@ -22,8 +22,10 @@ var lookupCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		for _, victim := range args {
-			if mac, ok := names[victim]; ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %q\n", mac, victim)
+			if macs, ok := names[victim]; ok {
+				for _, mac := range macs {
+					fmt.Fprintf(cmd.OutOrStdout(), "%s %q\n", mac, victim)
+				}
 			}
 
 			if name, ok := macs[unifi.MAC(victim)]; ok {

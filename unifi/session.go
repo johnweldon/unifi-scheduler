@@ -127,9 +127,9 @@ func (s *Session) GetRecentEvents() ([]Event, error) {
 	return s.getEvents(false)
 }
 
-func (s *Session) GetMACs() (map[MAC]string, error) {
+func (s *Session) GetMACs() (map[MAC][]string, error) {
 	var (
-		macs = map[MAC]string{}
+		macs = map[MAC]map[string]string{}
 
 		devices []Device
 		users   []Client
@@ -144,17 +144,16 @@ func (s *Session) GetMACs() (map[MAC]string, error) {
 	for _, device := range devices {
 		for _, name := range []string{
 			device.Name,
-			string(device.IP),
-			string(device.MAC),
 		} {
 			if len(name) == 0 {
 				continue
 			}
 
 			if _, ok := macs[device.MAC]; !ok {
-				macs[device.MAC] = name
-				continue
+				macs[device.MAC] = map[string]string{}
 			}
+
+			macs[device.MAC][name] = device.ID
 		}
 	}
 
@@ -166,28 +165,32 @@ func (s *Session) GetMACs() (map[MAC]string, error) {
 		for _, name := range []string{
 			user.Name,
 			user.Hostname,
-			user.DeviceName,
-			string(user.IP),
-			string(user.FixedIP),
-			string(user.MAC),
 		} {
 			if len(name) == 0 {
 				continue
 			}
 
 			if _, ok := macs[user.MAC]; !ok {
-				macs[user.MAC] = name
-				continue
+				macs[user.MAC] = map[string]string{}
 			}
+
+			macs[user.MAC][name] = user.ID
 		}
 	}
 
-	return macs, nil
+	ret := map[MAC][]string{}
+	for mac, m := range macs {
+		for name := range m {
+			ret[mac] = append(ret[mac], name)
+		}
+	}
+
+	return ret, nil
 }
 
-func (s *Session) GetNames() (map[string]MAC, error) {
+func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	var (
-		names = map[string]MAC{}
+		names = map[string]map[MAC]string{}
 
 		devices []Device
 		clients []Client
@@ -210,8 +213,10 @@ func (s *Session) GetNames() (map[string]MAC, error) {
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = device.MAC
+				names[name] = map[MAC]string{}
 			}
+
+			names[name][device.MAC] = device.ID
 		}
 	}
 
@@ -236,12 +241,21 @@ func (s *Session) GetNames() (map[string]MAC, error) {
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = user.MAC
+				names[name] = map[MAC]string{}
 			}
+
+			names[name][user.MAC] = user.ID
 		}
 	}
 
-	return names, nil
+	ret := map[string][]MAC{}
+	for name, m := range names {
+		for mac := range m {
+			ret[name] = append(ret[name], mac)
+		}
+	}
+
+	return ret, nil
 }
 
 func (s *Session) getClients(all bool) ([]Client, error) {

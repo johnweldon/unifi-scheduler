@@ -17,11 +17,13 @@ var kickCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		for _, victim := range args {
-			if mac, ok := names[victim]; ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "kicking %q (%s) ... ", victim, mac)
-				_, err := ses.Kick(mac)
-				cobra.CheckErr(err)
-				fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
+			if macs, ok := names[victim]; ok {
+				for _, mac := range macs {
+					fmt.Fprintf(cmd.OutOrStdout(), "kicking %q (%s) ... ", victim, mac)
+					_, err := ses.Kick(mac)
+					cobra.CheckErr(err)
+					fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
+				}
 			}
 		}
 	},
