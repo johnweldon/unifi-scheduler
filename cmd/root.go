@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/johnweldon/unifi-scheduler/unifi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/johnweldon/unifi-scheduler/unifi"
 )
 
 var (

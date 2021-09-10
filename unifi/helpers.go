@@ -1,9 +1,11 @@
 package unifi
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -14,9 +16,12 @@ type (
 	TimeStampMilliseconds int64
 	MAC                   string
 	IP                    string
+	Number                int64
 )
 
 func (d Duration) String() string { return (time.Second * time.Duration(d)).String() }
+
+func (t TimeStamp) String() string { return time.UnixMilli(int64(t)).Format(time.RFC3339) }
 
 func (lhs IP) Less(rhs IP) bool {
 	if len(rhs) == 0 {
@@ -49,6 +54,40 @@ func (lhs IP) Less(rhs IP) bool {
 	}
 
 	return false
+}
+
+func (n *Number) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 {
+		return nil
+	}
+
+	var (
+		s   string
+		i   int64
+		err error
+	)
+
+	if b[0] == '"' {
+		if err = json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+
+		if i, err = strconv.ParseInt(s, 10, 64); err != nil {
+			return err
+		}
+
+		*n = Number(i)
+
+		return nil
+	}
+
+	if err = json.Unmarshal(b, &i); err != nil {
+		return err
+	}
+
+	*n = Number(i)
+
+	return nil
 }
 
 // nolint: gochecknoglobals

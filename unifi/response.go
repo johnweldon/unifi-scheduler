@@ -15,3 +15,11 @@ type DeviceResponse struct {
 	}
 	Data []Device `json:"data,omitempty"`
 }
+
+// EventResponse encapsulates a UniFi http response.
+type EventResponse struct {
+	Meta struct {
+		RC string `json:"rc,omitempty"`
+	}
+	Data []Event `json:"data,omitempty"`
+}

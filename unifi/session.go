@@ -119,6 +119,72 @@ func (s *Session) GetUsers() ([]Client, error) {
 	return s.getClients(true)
 }
 
+func (s *Session) GetAllEvents() ([]Event, error) {
+	return s.getEvents(true)
+}
+
+func (s *Session) GetRecentEvents() ([]Event, error) {
+	return s.getEvents(false)
+}
+
+func (s *Session) GetMACs() (map[MAC]string, error) {
+	var (
+		macs = map[MAC]string{}
+
+		devices []Device
+		users   []Client
+
+		err error
+	)
+
+	if devices, err = s.GetDevices(); err != nil {
+		return nil, fmt.Errorf("getting devices: %w", err)
+	}
+
+	for _, device := range devices {
+		for _, name := range []string{
+			device.Name,
+			string(device.IP),
+			string(device.MAC),
+		} {
+			if len(name) == 0 {
+				continue
+			}
+
+			if _, ok := macs[device.MAC]; !ok {
+				macs[device.MAC] = name
+				continue
+			}
+		}
+	}
+
+	if users, err = s.GetUsers(); err != nil {
+		return nil, fmt.Errorf("getting users: %w", err)
+	}
+
+	for _, user := range users {
+		for _, name := range []string{
+			user.Name,
+			user.Hostname,
+			user.DeviceName,
+			string(user.IP),
+			string(user.FixedIP),
+			string(user.MAC),
+		} {
+			if len(name) == 0 {
+				continue
+			}
+
+			if _, ok := macs[user.MAC]; !ok {
+				macs[user.MAC] = name
+				continue
+			}
+		}
+	}
+
+	return macs, nil
+}
+
 func (s *Session) GetNames() (map[string]MAC, error) {
 	var (
 		names = map[string]MAC{}
@@ -138,7 +204,6 @@ func (s *Session) GetNames() (map[string]MAC, error) {
 		for _, name := range []string{
 			device.Name,
 			string(device.IP),
-			string(device.MAC),
 		} {
 			if len(name) == 0 {
 				continue
@@ -165,7 +230,6 @@ func (s *Session) GetNames() (map[string]MAC, error) {
 			user.DeviceName,
 			string(user.IP),
 			string(user.FixedIP),
-			string(user.MAC),
 		} {
 			if len(name) == 0 {
 				continue
@@ -246,6 +310,62 @@ func (s *Session) getDevices() (map[string]Device, error) {
 	}
 
 	return devices, nil
+}
+
+func (s *Session) getEvents(all bool) ([]Event, error) {
+	var (
+		eventsJSON string
+		eresp      EventResponse
+
+		err error
+	)
+
+	fetch := s.ListEvents
+	if all {
+		fetch = s.ListAllEvents
+	}
+
+	if eventsJSON, err = fetch(); err != nil {
+		return nil, fmt.Errorf("fetching events: %w", err)
+	}
+
+	if err = json.Unmarshal([]byte(eventsJSON), &eresp); err != nil {
+		return nil, fmt.Errorf("unmarshaling events: %w", err)
+	}
+
+	return eresp.Data, nil
+}
+
+// ListEvents describes the latest events.
+func (s *Session) ListEvents() (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+
+	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/stat/event", s.Endpoint))
+	if err != nil {
+		s.setError(err)
+
+		return "", s.err
+	}
+
+	return s.get(u)
+}
+
+// ListAllEvents describes all events.
+func (s *Session) ListAllEvents() (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+
+	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/rest/event", s.Endpoint))
+	if err != nil {
+		s.setError(err)
+
+		return "", s.err
+	}
+
+	return s.get(u)
 }
 
 // ListUsers describes the known UniFi clients.

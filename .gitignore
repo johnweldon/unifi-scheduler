@@ -1,7 +1,8 @@
+*.json
 .env
 .envrc
 block
+devices
+list
 unblock
 unifi-scheduler
-list
-devices
