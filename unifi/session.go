@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -183,6 +184,8 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 		for name := range m {
 			ret[mac] = append(ret[mac], name)
 		}
+
+		sort.Stable(sort.Reverse(sort.StringSlice(ret[mac])))
 	}
 
 	return ret, nil
