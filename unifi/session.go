@@ -356,6 +356,11 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 	return eresp.Data, nil
 }
 
+// Raw executes arbitrary endpoints.
+func (s *Session) Raw(method, path string, body io.Reader) (string, error) {
+	return s.action(method, path, body)
+}
+
 // ListEvents describes the latest events.
 func (s *Session) ListEvents() (string, error) { return s.action(http.MethodGet, "/stat/event", nil) }
 
