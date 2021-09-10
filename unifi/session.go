@@ -26,6 +26,9 @@ type Session struct {
 	login  func() (string, error)
 	err    error
 
+	nonUDMPro bool
+	site      string
+
 	outWriter io.Writer
 	errWriter io.Writer
 }
@@ -354,100 +357,31 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 }
 
 // ListEvents describes the latest events.
-func (s *Session) ListEvents() (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/stat/event", s.Endpoint))
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	return s.get(u)
-}
+func (s *Session) ListEvents() (string, error) { return s.action(http.MethodGet, "/stat/event", nil) }
 
 // ListAllEvents describes all events.
 func (s *Session) ListAllEvents() (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/rest/event", s.Endpoint))
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	return s.get(u)
+	return s.action(http.MethodGet, "/rest/event", nil)
 }
 
 // ListUsers describes the known UniFi clients.
-func (s *Session) ListUsers() (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/rest/user", s.Endpoint))
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	return s.get(u)
-}
+func (s *Session) ListUsers() (string, error) { return s.action(http.MethodGet, "/rest/user", nil) }
 
 // ListClients describes currently connected clients.
-func (s *Session) ListClients() (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/stat/sta", s.Endpoint))
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	return s.get(u)
-}
+func (s *Session) ListClients() (string, error) { return s.action(http.MethodGet, "/stat/sta", nil) }
 
 // ListDevices describes currently connected clients.
-func (s *Session) ListDevices() (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/stat/device", s.Endpoint))
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	return s.get(u)
-}
+func (s *Session) ListDevices() (string, error) { return s.action(http.MethodGet, "/stat/device", nil) }
 
 // Kick disconnects a connected client, identified by MAC address.
-func (s *Session) Kick(mac MAC) (string, error) {
-	return s.macAction("kick-sta", mac)
-}
+func (s *Session) Kick(mac MAC) (string, error) { return s.macAction("kick-sta", mac) }
 
 // Block prevents a specific client (identified by MAC) from connecting
 // to the UniFi network.
-func (s *Session) Block(mac MAC) (string, error) {
-	return s.macAction("block-sta", mac)
-}
+func (s *Session) Block(mac MAC) (string, error) { return s.macAction("block-sta", mac) }
 
 // Unblock re-enables a specific client.
-func (s *Session) Unblock(mac MAC) (string, error) {
-	return s.macAction("unblock-sta", mac)
-}
+func (s *Session) Unblock(mac MAC) (string, error) { return s.macAction("unblock-sta", mac) }
 
 func (s *Session) BlockFn(clients []Client, keys map[string]bool) {
 	for _, client := range clients {
@@ -506,21 +440,50 @@ func (s *Session) webLogin() (string, error) {
 	return respBody, err
 }
 
-func (s *Session) macAction(action, mac MAC) (string, error) {
-	if b, err := s.login(); err != nil {
-		return b, err
+func (s *Session) buildURL(path string) (*url.URL, error) {
+	if s.err != nil {
+		return nil, s.err
 	}
 
-	u, err := url.Parse(fmt.Sprintf("%s/proxy/network/api/s/default/cmd/stamgr", s.Endpoint))
+	pathPrefix := "/proxy/network"
+	if s.nonUDMPro {
+		pathPrefix = ""
+	}
+
+	site := "default"
+	if len(s.site) > 0 {
+		site = s.site
+	}
+
+	return url.Parse(fmt.Sprintf("%s%s/api/s/%s%s", s.Endpoint, pathPrefix, site, path))
+}
+
+func (s *Session) macAction(action, mac MAC) (string, error) {
+	r := bytes.NewBufferString(fmt.Sprintf(`{"cmd":%q,"mac":%q}`, action, mac))
+
+	return s.action(http.MethodPost, "/cmd/stamgr", r)
+}
+
+func (s *Session) action(method, path string, body io.Reader) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+
+	u, err := s.buildURL(path)
 	if err != nil {
 		s.setError(err)
 
 		return "", s.err
 	}
 
-	r := bytes.NewBufferString(fmt.Sprintf(`{"cmd":%q,"mac":%q}`, action, mac))
-
-	return s.post(u, r)
+	switch method {
+	case http.MethodGet:
+		return s.get(u)
+	case http.MethodPost:
+		return s.post(u, body)
+	default:
+		return "", fmt.Errorf("unconfigured method: %q", method)
+	}
 }
 
 func (s *Session) get(u fmt.Stringer) (string, error) {
