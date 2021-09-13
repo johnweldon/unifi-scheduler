@@ -5,8 +5,9 @@ import (
 )
 
 var deviceCmd = &cobra.Command{
-	Use:   "device",
-	Short: "interact with device specific endpoints",
+	Use:     "device",
+	Aliases: []string{"dev", "devices"},
+	Short:   "interact with device specific endpoints",
 }
 
 func init() { // nolint: gochecknoinits

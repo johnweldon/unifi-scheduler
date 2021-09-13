@@ -7,8 +7,9 @@ import (
 )
 
 var kickCmd = &cobra.Command{
-	Use:   "kick",
-	Short: "kick client",
+	Use:     "kick",
+	Aliases: []string{"k"},
+	Short:   "kick client",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

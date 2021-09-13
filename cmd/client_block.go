@@ -7,8 +7,9 @@ import (
 )
 
 var blockCmd = &cobra.Command{
-	Use:   "block",
-	Short: "block client",
+	Use:     "block",
+	Aliases: []string{"blk", "bl"},
+	Short:   "block client",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

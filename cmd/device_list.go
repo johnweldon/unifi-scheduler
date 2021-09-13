@@ -7,8 +7,9 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "list devices",
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "list devices",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

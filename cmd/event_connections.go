@@ -10,8 +10,9 @@ import (
 )
 
 var eventConnectionsCmd = &cobra.Command{
-	Use:   "connections",
-	Short: "connections events",
+	Use:     "connections",
+	Aliases: []string{"conns"},
+	Short:   "connections events",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

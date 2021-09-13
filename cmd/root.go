@@ -19,8 +19,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "unifi-scheduler",
-	Short: "utility for interacting with unifi",
+	Use:     "unifi-scheduler",
+	Aliases: []string{"ucli"},
+	Short:   "utility for interacting with unifi",
 }
 
 func Execute() {

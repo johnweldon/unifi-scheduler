@@ -7,8 +7,9 @@ import (
 )
 
 var unblockCmd = &cobra.Command{
-	Use:   "unblock",
-	Short: "unblock client",
+	Use:     "unblock",
+	Aliases: []string{"ublock", "unblk", "u"},
+	Short:   "unblock client",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

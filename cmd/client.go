@@ -5,8 +5,9 @@ import (
 )
 
 var clientCmd = &cobra.Command{
-	Use:   "client",
-	Short: "interact with client specific endpoints",
+	Use:     "client",
+	Aliases: []string{"cl", "user", "clients", "users"},
+	Short:   "interact with client specific endpoints",
 }
 
 func init() { // nolint: gochecknoinits

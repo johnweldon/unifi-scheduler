@@ -5,8 +5,9 @@ import (
 )
 
 var eventCmd = &cobra.Command{
-	Use:   "event",
-	Short: "interact with event specific endpoints",
+	Use:     "event",
+	Aliases: []string{"events", "evt", "evts"},
+	Short:   "interact with event specific endpoints",
 }
 
 func init() { // nolint: gochecknoinits

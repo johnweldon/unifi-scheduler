@@ -9,8 +9,9 @@ import (
 var allEvents bool
 
 var eventListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "list events",
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "list events",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

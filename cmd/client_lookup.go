@@ -9,8 +9,9 @@ import (
 )
 
 var lookupCmd = &cobra.Command{
-	Use:   "lookup",
-	Short: "lookup client",
+	Use:     "lookup",
+	Aliases: []string{"look"},
+	Short:   "lookup client",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

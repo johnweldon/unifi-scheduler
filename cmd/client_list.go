@@ -9,8 +9,9 @@ import (
 var all bool
 
 var clientListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "list clients",
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "list clients",
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
