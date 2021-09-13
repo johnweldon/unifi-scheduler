@@ -34,9 +34,7 @@ var rawCmd = &cobra.Command{
 	},
 }
 
-var (
-	method = http.MethodGet
-)
+var method = http.MethodGet
 
 func init() { // nolint: gochecknoinits
 	rootCmd.AddCommand(rawCmd)

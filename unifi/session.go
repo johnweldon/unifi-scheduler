@@ -11,8 +11,9 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
-	"sort"
 	"time"
+
+	"github.com/johnweldon/unifi-scheduler/types"
 )
 
 // Session wraps metadata to manage session state.
@@ -133,7 +134,7 @@ func (s *Session) GetRecentEvents() ([]Event, error) {
 
 func (s *Session) GetMACs() (map[MAC][]string, error) {
 	var (
-		macs = map[MAC]map[string]string{}
+		macs = map[MAC]*types.OrderedStringSet{}
 
 		devices []Device
 		users   []Client
@@ -154,10 +155,10 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 			}
 
 			if _, ok := macs[device.MAC]; !ok {
-				macs[device.MAC] = map[string]string{}
+				macs[device.MAC] = &types.OrderedStringSet{}
 			}
 
-			macs[device.MAC][name] = device.ID
+			macs[device.MAC].Add(name)
 		}
 	}
 
@@ -175,20 +176,16 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 			}
 
 			if _, ok := macs[user.MAC]; !ok {
-				macs[user.MAC] = map[string]string{}
+				macs[user.MAC] = &types.OrderedStringSet{}
 			}
 
-			macs[user.MAC][name] = user.ID
+			macs[user.MAC].Add(name)
 		}
 	}
 
 	ret := map[MAC][]string{}
 	for mac, m := range macs {
-		for name := range m {
-			ret[mac] = append(ret[mac], name)
-		}
-
-		sort.Stable(sort.Reverse(sort.StringSlice(ret[mac])))
+		ret[mac] = m.Values()
 	}
 
 	return ret, nil
@@ -196,7 +193,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 
 func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	var (
-		names = map[string]map[MAC]string{}
+		names = map[string]*types.OrderedStringSet{}
 
 		devices []Device
 		clients []Client
@@ -219,10 +216,10 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = map[MAC]string{}
+				names[name] = &types.OrderedStringSet{}
 			}
 
-			names[name][device.MAC] = device.ID
+			names[name].Add(string(device.MAC))
 		}
 	}
 
@@ -247,18 +244,22 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = map[MAC]string{}
+				names[name] = &types.OrderedStringSet{}
 			}
 
-			names[name][user.MAC] = user.ID
+			names[name].Add(string(user.MAC))
 		}
 	}
 
 	ret := map[string][]MAC{}
 	for name, m := range names {
-		for mac := range m {
-			ret[name] = append(ret[name], mac)
+		vals := m.Values()
+		macs := make([]MAC, len(vals))
+		for ix, val := range vals {
+			macs[ix] = MAC(val)
 		}
+
+		ret[name] = macs
 	}
 
 	return ret, nil
