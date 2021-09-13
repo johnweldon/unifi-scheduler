@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -35,8 +34,14 @@ var eventConnectionsCmd = &cobra.Command{
 				event.Guest,
 			} {
 				if names, ok = macs[mac]; ok {
-					name := strings.Join(names, ", ")
-					fmt.Fprintf(cmd.OutOrStdout(), "%50s  %-25s  %s\n", name, event.Key, event.TimeStamp)
+					name := string(mac)
+					if len(names) > 0 {
+						name = names[0]
+					}
+
+					evt := event.Key[7:]
+
+					fmt.Fprintf(cmd.OutOrStdout(), "%20s  %-15s  %s\n", name, evt, event.TimeStamp)
 				}
 			}
 		}
