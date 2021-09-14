@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/johnweldon/unifi-scheduler/types"
+	"github.com/jw4/x/stringset"
 )
 
 // Session wraps metadata to manage session state.
@@ -134,7 +134,7 @@ func (s *Session) GetRecentEvents() ([]Event, error) {
 
 func (s *Session) GetMACs() (map[MAC][]string, error) {
 	var (
-		macs = map[MAC]*types.OrderedStringSet{}
+		macs = map[MAC]*stringset.OrderedStringSet{}
 
 		devices []Device
 		users   []Client
@@ -155,7 +155,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 			}
 
 			if _, ok := macs[device.MAC]; !ok {
-				macs[device.MAC] = &types.OrderedStringSet{}
+				macs[device.MAC] = &stringset.OrderedStringSet{}
 			}
 
 			macs[device.MAC].Add(name)
@@ -176,7 +176,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 			}
 
 			if _, ok := macs[user.MAC]; !ok {
-				macs[user.MAC] = &types.OrderedStringSet{}
+				macs[user.MAC] = &stringset.OrderedStringSet{}
 			}
 
 			macs[user.MAC].Add(name)
@@ -193,7 +193,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 
 func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	var (
-		names = map[string]*types.OrderedStringSet{}
+		names = map[string]*stringset.OrderedStringSet{}
 
 		devices []Device
 		clients []Client
@@ -216,7 +216,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = &types.OrderedStringSet{}
+				names[name] = &stringset.OrderedStringSet{}
 			}
 
 			names[name].Add(string(device.MAC))
@@ -244,7 +244,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			}
 
 			if _, ok := names[name]; !ok {
-				names[name] = &types.OrderedStringSet{}
+				names[name] = &stringset.OrderedStringSet{}
 			}
 
 			names[name].Add(string(user.MAC))
@@ -293,7 +293,7 @@ func (s *Session) getClients(all bool) ([]Client, error) {
 	}
 
 	if err = json.Unmarshal([]byte(clientsJSON), &cresp); err != nil {
-		return nil, fmt.Errorf("unmarshaling clients: %w", err)
+		return nil, fmt.Errorf("unmarshalling clients: %w", err)
 	}
 
 	for _, client := range cresp.Data {
@@ -323,7 +323,7 @@ func (s *Session) getDevices() (map[string]Device, error) {
 	}
 
 	if err = json.Unmarshal([]byte(devicesJSON), &dresp); err != nil {
-		return nil, fmt.Errorf("unmarshaling devices: %w", err)
+		return nil, fmt.Errorf("unmarshalling devices: %w", err)
 	}
 
 	for _, device := range dresp.Data {
@@ -351,7 +351,7 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 	}
 
 	if err = json.Unmarshal([]byte(eventsJSON), &eresp); err != nil {
-		return nil, fmt.Errorf("unmarshaling events: %w", err)
+		return nil, fmt.Errorf("unmarshalling events: %w", err)
 	}
 
 	return eresp.Data, nil
