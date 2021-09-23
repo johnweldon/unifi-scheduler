@@ -66,7 +66,7 @@ var clientListCmd = &cobra.Command{
 				client.DisplaySwitchName(),
 			})
 		}
-		t.AppendFooter(table.Row{fmt.Sprintf("Total %d", len(clients))})
+		t.AppendFooter(table.Row{fmt.Sprintf("Total %d", t.Length())})
 
 		t.Render()
 	},

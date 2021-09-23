@@ -20,9 +20,11 @@ type (
 	Number                int64
 )
 
-func (d Duration) String() string { return (time.Second * time.Duration(d)).String() }
+func (d Duration) String() string {
+	return humanize.Time(time.Now().Add(-time.Second * time.Duration(d)))
+}
 
-func (t TimeStamp) String() string { return time.UnixMilli(int64(t)).Format(time.RFC3339) }
+func (t TimeStamp) String() string { return humanize.Time(time.UnixMilli(int64(t))) }
 
 func (lhs IP) Less(rhs IP) bool {
 	if len(rhs) == 0 {
