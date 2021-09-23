@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
@@ -25,16 +27,16 @@ var clientListCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		configs := []table.ColumnConfig{
-			{Name: "Name", Align: text.AlignRight},
+			{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
 			{Name: "B"},
 			{Name: "G"},
 			{Name: "W"},
 			{Name: "IP"},
 			{Name: "Uptime"},
-			{Name: "Rx", Align: text.AlignRight},
-			{Name: "Tx", Align: text.AlignRight},
-			{Name: "Rx Rate", Align: text.AlignRight},
-			{Name: "Tx Rate", Align: text.AlignRight},
+			{Name: "Rx", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
+			{Name: "Tx", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
+			{Name: "Rx Rate", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
+			{Name: "Tx Rate", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
 			{Name: "Link"},
 		}
 
@@ -64,7 +66,7 @@ var clientListCmd = &cobra.Command{
 				client.DisplaySwitchName(),
 			})
 		}
-		t.AppendFooter(table.Row{len(clients)})
+		t.AppendFooter(table.Row{fmt.Sprintf("Total %d", len(clients))})
 
 		t.Render()
 	},
