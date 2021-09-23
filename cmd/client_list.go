@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"fmt"
-
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
@@ -24,9 +24,49 @@ var clientListCmd = &cobra.Command{
 		clients, err := fetch()
 		cobra.CheckErr(err)
 
-		for _, client := range clients {
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", client.String())
+		configs := []table.ColumnConfig{
+			{Name: "Name", Align: text.AlignRight},
+			{Name: "B"},
+			{Name: "G"},
+			{Name: "W"},
+			{Name: "IP"},
+			{Name: "Uptime"},
+			{Name: "Rx", Align: text.AlignRight},
+			{Name: "Tx", Align: text.AlignRight},
+			{Name: "Rx Rate", Align: text.AlignRight},
+			{Name: "Tx Rate", Align: text.AlignRight},
+			{Name: "Link"},
 		}
+
+		headerRow := table.Row{}
+		for _, c := range configs {
+			headerRow = append(headerRow, c.Name)
+		}
+
+		t := table.NewWriter()
+		t.SetStyle(table.StyleColoredDark)
+		t.SetColumnConfigs(configs)
+		t.SetOutputMirror(cmd.OutOrStdout())
+
+		t.AppendHeader(headerRow)
+		for _, client := range clients {
+			t.AppendRow([]interface{}{
+				client.DisplayName(),
+				string(client.IsBlockedGlyph()),
+				string(client.IsGuestGlyph()),
+				string(client.IsWiredGlyph()),
+				client.DisplayIP(),
+				client.DisplayUptime(),
+				client.DisplayReceivedBytes(),
+				client.DisplaySentBytes(),
+				client.DisplayReceiveRate(),
+				client.DisplaySendRate(),
+				client.DisplaySwitchName(),
+			})
+		}
+		t.AppendFooter(table.Row{len(clients)})
+
+		t.Render()
 	},
 }
 

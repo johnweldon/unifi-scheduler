@@ -18,7 +18,7 @@ var (
 	ClientGuest         = func(lhs, rhs *Client) bool { return !lhs.IsGuest && rhs.IsGuest }
 	ClientWired         = func(lhs, rhs *Client) bool { return lhs.IsWired && !rhs.IsWired }
 	ClientLastSeen      = func(lhs, rhs *Client) bool { return lhs.LastSeen < rhs.LastSeen }
-	ClientName          = func(lhs, rhs *Client) bool { return lhs.Name < rhs.Name }
+	ClientName          = func(lhs, rhs *Client) bool { return lhs.DisplayName() < rhs.DisplayName() }
 	ClientNetwork       = func(lhs, rhs *Client) bool { return lhs.Network < rhs.Network }
 	ClientNoise         = func(lhs, rhs *Client) bool { return lhs.Noise < rhs.Noise }
 	ClientSatisfaction  = func(lhs, rhs *Client) bool { return lhs.Satisfaction < rhs.Satisfaction }
@@ -27,7 +27,7 @@ var (
 	ClientUptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
 	ClientDefault    = ClientOrderedBy(ClientWired, ClientIP)
-	ClientHistorical = ClientOrderedBy(ClientName, ClientLastSeen)
+	ClientHistorical = ClientOrderedBy(ClientLastSeen)
 
 	ShowRate = false
 )
@@ -139,72 +139,122 @@ type Client struct {
 	UpstreamName string `json:"upstream_name,omitempty"`
 }
 
-func (client *Client) String() string {
-	display := firstNonEmpty(client.Name, client.Hostname, client.DeviceName, client.OUI, string(client.MAC), "-")
-	ip := firstNonEmpty(string(client.IP), string(client.FixedIP))
-
-	blocked := ""
+func (client *Client) IsBlockedGlyph() rune {
 	if client.IsBlocked {
-		blocked = "✗"
+		return '✗'
 	}
 
-	guest := ""
+	return ' '
+}
+
+func (client *Client) IsGuestGlyph() rune {
 	if client.IsGuest {
-		guest = "✓"
+		return '✓'
 	}
 
-	wired := "⌔"
+	return ' '
+}
+
+func (client *Client) IsWiredGlyph() rune {
 	if client.IsWired {
-		wired = "⌁"
+		return '⌁'
 	}
 
-	uptime := (time.Duration(client.Uptime) * time.Second).String()
+	return '⌔'
+}
+
+func (client *Client) DisplayName() string {
+	return firstNonEmpty(client.Name, client.Hostname, client.DeviceName, client.OUI, string(client.MAC), "-")
+}
+
+func (client *Client) DisplayIP() string {
+	return firstNonEmpty(string(client.IP), string(client.FixedIP))
+}
+
+func (client *Client) DisplayUptime() string {
 	if client.Uptime == 0 {
-		uptime = time.Unix(client.LastSeen, 0).Format(time.RFC3339)
+		return time.Unix(client.LastSeen, 0).Format(time.RFC3339)
 	}
 
-	traffic := ""
-	if client.BytesReceived+client.BytesSent > 0 {
-		recvd := formatBytesSize(client.BytesReceived)
-		sent := formatBytesSize(client.BytesSent)
-		traffic = fmt.Sprintf("%11s↓ %11s↑", recvd, sent)
+	return (time.Duration(client.Uptime) * time.Second).String()
+}
+
+func (client *Client) DisplayReceivedBytes() string {
+	if client.IsWired {
+		return formatBytesSize(client.WiredBytesReceived)
 	}
 
+	return formatBytesSize(client.BytesReceived)
+}
+
+func (client *Client) DisplaySentBytes() string {
+	if client.IsWired {
+		return formatBytesSize(client.WiredBytesSent)
+	}
+
+	return formatBytesSize(client.BytesSent)
+}
+
+func (client *Client) DisplayReceiveRate() string {
+	if client.IsWired {
+		if client.WiredRateMBPS == 0 {
+			return ""
+		}
+
+		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+	}
+
+	return formatBytesSize(client.ReceiveRate)
+}
+
+func (client *Client) DisplaySendRate() string {
+	if client.IsWired {
+		if client.WiredRateMBPS == 0 {
+			return ""
+		}
+
+		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+	}
+
+	return formatBytesSize(client.TransmitRate)
+}
+
+func (client *Client) DisplayConnectionRate() string {
+	if client.IsWired {
+		if client.WiredRateMBPS == 0 {
+			return ""
+		}
+
+		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+	}
+
+	return fmt.Sprintf("%11s↓ %11s↑", client.DisplayReceiveRate(), client.DisplaySendRate())
+}
+
+func (client *Client) DisplaySwitchName() string {
+	if len(client.UpstreamName) > 0 {
+		return client.UpstreamName
+	}
+
+	return client.UpstreamMAC()
+}
+
+func (client *Client) String() string {
 	rate := ""
 	if ShowRate {
-		rate = fmt.Sprintf("%11s↓ %11s↑", formatBytesSize(client.ReceiveRate), formatBytesSize(client.TransmitRate))
-	}
-
-	if client.IsWired {
-		if client.WiredBytesReceived+client.WiredBytesSent > 0 {
-			recvd := formatBytesSize(client.WiredBytesReceived)
-			sent := formatBytesSize(client.WiredBytesSent)
-			traffic = fmt.Sprintf("%11s↓ %11s↑", recvd, sent)
-		}
-		if ShowRate {
-			rate = fmt.Sprintf("%-21s", fmt.Sprintf("%8s", fmt.Sprintf("%d MB", client.WiredRateMBPS)))
-		}
-	}
-
-	if ShowRate {
-		rate = fmt.Sprintf("%25s", rate)
-	}
-
-	upstream := ""
-	if len(client.UpstreamName) > 0 {
-		upstream = fmt.Sprintf(" %s", client.UpstreamName)
+		rate = fmt.Sprintf("%25s", client.DisplayConnectionRate())
 	}
 
 	return fmt.Sprintf("%25s %-2s%-2s%-2s %-15s %-14s %-25s %s %s",
-		display,
-		blocked,
-		guest,
-		wired,
-		ip,
-		uptime,
-		traffic,
+		client.DisplayName(),
+		string(client.IsBlockedGlyph()),
+		string(client.IsGuestGlyph()),
+		string(client.IsWiredGlyph()),
+		client.DisplayIP(),
+		client.DisplayUptime(),
+		fmt.Sprintf("%11s↓ %11s↑", client.DisplayReceivedBytes(), client.DisplaySentBytes()),
 		rate,
-		upstream,
+		client.DisplaySwitchName(),
 	)
 }
 

@@ -114,7 +114,7 @@ func round(val, roundOn float64, places int) float64 {
 // nolint: gomnd
 func formatBytesSize(size int64) string {
 	if size <= 0 {
-		return "0 B"
+		return ""
 	}
 
 	base := math.Log(float64(size)) / math.Log(1024)
