@@ -11,10 +11,10 @@ import (
 
 // rawCmd represents the raw command
 var rawCmd = &cobra.Command{
-	Use:   "raw",
+	Use:     "raw",
 	Aliases: []string{"r"},
-	Short: "issue raw API commands",
-	Args:  cobra.RangeArgs(1, 2),
+	Short:   "issue raw API commands",
+	Args:    cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)

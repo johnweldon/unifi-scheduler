@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 var (
@@ -173,10 +175,10 @@ func (client *Client) DisplayIP() string {
 
 func (client *Client) DisplayUptime() string {
 	if client.Uptime == 0 {
-		return time.Unix(client.LastSeen, 0).Format(time.RFC3339)
+		return humanize.Time(time.Unix(client.LastSeen, 0))
 	}
 
-	return (time.Duration(client.Uptime) * time.Second).String()
+	return humanize.Time(time.Now().Add(time.Duration(client.Uptime) * -time.Second))
 }
 
 func (client *Client) DisplayReceivedBytes() string {
@@ -201,7 +203,7 @@ func (client *Client) DisplayReceiveRate() string {
 			return ""
 		}
 
-		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+		return humanize.Bytes(uint64(client.WiredRateMBPS * 1000000))
 	}
 
 	return formatBytesSize(client.ReceiveRate)
@@ -213,7 +215,7 @@ func (client *Client) DisplaySendRate() string {
 			return ""
 		}
 
-		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+		return humanize.Bytes(uint64(client.WiredRateMBPS * 1000000))
 	}
 
 	return formatBytesSize(client.TransmitRate)
@@ -225,7 +227,7 @@ func (client *Client) DisplayConnectionRate() string {
 			return ""
 		}
 
-		return fmt.Sprintf("%d Mbps", client.WiredRateMBPS)
+		return humanize.Bytes(uint64(client.WiredRateMBPS * 1000000))
 	}
 
 	return fmt.Sprintf("%11s↓ %11s↑", client.DisplayReceiveRate(), client.DisplaySendRate())

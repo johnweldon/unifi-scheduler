@@ -2,11 +2,12 @@ package unifi
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 type (
@@ -117,11 +118,7 @@ func formatBytesSize(size int64) string {
 		return ""
 	}
 
-	base := math.Log(float64(size)) / math.Log(1024)
-	rounded := round(math.Pow(1024, base-math.Floor(base)), .5, 2)
-	suffix := suffixes[int(math.Floor(base))]
-
-	return fmt.Sprintf("%.2f %s", rounded, suffix)
+	return humanize.Bytes(uint64(size))
 }
 
 func firstNonEmpty(s ...string) string {
