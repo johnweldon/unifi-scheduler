@@ -16,7 +16,7 @@ var (
 	ClientAuthorized    = func(lhs, rhs *Client) bool { return !lhs.IsAuthorized && rhs.IsAuthorized }
 	ClientBlocked       = func(lhs, rhs *Client) bool { return !lhs.IsBlocked && rhs.IsBlocked }
 	ClientGuest         = func(lhs, rhs *Client) bool { return !lhs.IsGuest && rhs.IsGuest }
-	ClientWired         = func(lhs, rhs *Client) bool { return !lhs.IsWired && rhs.IsWired }
+	ClientWired         = func(lhs, rhs *Client) bool { return lhs.IsWired && !rhs.IsWired }
 	ClientLastSeen      = func(lhs, rhs *Client) bool { return lhs.LastSeen < rhs.LastSeen }
 	ClientName          = func(lhs, rhs *Client) bool { return lhs.Name < rhs.Name }
 	ClientNetwork       = func(lhs, rhs *Client) bool { return lhs.Network < rhs.Network }
@@ -26,8 +26,10 @@ var (
 	ClientSignal        = func(lhs, rhs *Client) bool { return lhs.Signal < rhs.Signal }
 	ClientUptime        = func(lhs, rhs *Client) bool { return lhs.Uptime < rhs.Uptime }
 
-	ClientDefault    = ClientOrderedBy(ClientIP)
+	ClientDefault    = ClientOrderedBy(ClientWired, ClientIP)
 	ClientHistorical = ClientOrderedBy(ClientName, ClientLastSeen)
+
+	ShowRate = false
 )
 
 // Client describes a UniFi network client.
@@ -165,7 +167,27 @@ func (client *Client) String() string {
 	if client.BytesReceived+client.BytesSent > 0 {
 		recvd := formatBytesSize(client.BytesReceived)
 		sent := formatBytesSize(client.BytesSent)
-		traffic = fmt.Sprintf("%10s ↓ / %10s ↑", recvd, sent)
+		traffic = fmt.Sprintf("%11s↓ %11s↑", recvd, sent)
+	}
+
+	rate := ""
+	if ShowRate {
+		rate = fmt.Sprintf("%11s↓ %11s↑", formatBytesSize(client.ReceiveRate), formatBytesSize(client.TransmitRate))
+	}
+
+	if client.IsWired {
+		if client.WiredBytesReceived+client.WiredBytesSent > 0 {
+			recvd := formatBytesSize(client.WiredBytesReceived)
+			sent := formatBytesSize(client.WiredBytesSent)
+			traffic = fmt.Sprintf("%11s↓ %11s↑", recvd, sent)
+		}
+		if ShowRate {
+			rate = fmt.Sprintf("%-21s", fmt.Sprintf("%8s", fmt.Sprintf("%d MB", client.WiredRateMBPS)))
+		}
+	}
+
+	if ShowRate {
+		rate = fmt.Sprintf("%25s", rate)
 	}
 
 	upstream := ""
@@ -173,7 +195,7 @@ func (client *Client) String() string {
 		upstream = fmt.Sprintf(" %s", client.UpstreamName)
 	}
 
-	return fmt.Sprintf("%25s %-2s %-2s %-2s %-15s %-14s %s %s",
+	return fmt.Sprintf("%25s %-2s%-2s%-2s %-15s %-14s %-25s %s %s",
 		display,
 		blocked,
 		guest,
@@ -181,6 +203,7 @@ func (client *Client) String() string {
 		ip,
 		uptime,
 		traffic,
+		rate,
 		upstream,
 	)
 }
