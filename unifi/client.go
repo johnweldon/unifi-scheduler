@@ -198,27 +198,38 @@ func (client *Client) DisplaySentBytes() string {
 }
 
 func (client *Client) DisplayReceiveRate() string {
-	if client.IsWired {
-		if client.WiredRateMBPS == 0 {
-			return ""
-		}
-
-		return humanize.Bytes(uint64(client.WiredRateMBPS * 1000000))
+	rate := client.DisplayWiredRate()
+	if len(rate) > 0 {
+		return rate
 	}
 
 	return formatBytesSize(client.ReceiveRate)
 }
 
 func (client *Client) DisplaySendRate() string {
+	rate := client.DisplayWiredRate()
+	if len(rate) > 0 {
+		return rate
+	}
+
+	return formatBytesSize(client.TransmitRate)
+}
+
+func (client *Client) DisplayWiredRate() string {
 	if client.IsWired {
-		if client.WiredRateMBPS == 0 {
+		switch client.WiredRateMBPS {
+		case 0:
 			return ""
+		case 100:
+			return "FE"
+		case 1000:
+			return "GbE"
 		}
 
 		return humanize.Bytes(uint64(client.WiredRateMBPS * 1000000))
 	}
 
-	return formatBytesSize(client.TransmitRate)
+	return ""
 }
 
 func (client *Client) DisplayConnectionRate() string {
