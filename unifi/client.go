@@ -173,9 +173,13 @@ func (client *Client) DisplayIP() string {
 	return firstNonEmpty(string(client.IP), string(client.FixedIP))
 }
 
+func (client *Client) DisplayLastAssociated() string {
+	return humanize.Time(time.Unix(client.LastAssociatedAt, 0))
+}
+
 func (client *Client) DisplayUptime() string {
 	if client.Uptime == 0 {
-		return humanize.Time(time.Unix(client.LastSeen, 0))
+		return humanize.Time(time.Unix(client.LastAssociatedAt, 0))
 	}
 
 	return humanize.Time(time.Now().Add(time.Duration(client.Uptime) * -time.Second))
