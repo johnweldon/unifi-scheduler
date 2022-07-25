@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -116,4 +117,14 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 	}
 
 	return ses, nil
+}
+
+var StyleDefault = table.Style{
+	Name:    "StyleDefault",
+	Box:     table.StyleBoxDefault,
+	Color:   table.ColorOptionsDefault,
+	Format:  table.FormatOptionsDefault,
+	HTML:    table.DefaultHTMLOptions,
+	Options: table.OptionsNoBordersAndSeparators,
+	Title:   table.TitleOptionsBright,
 }

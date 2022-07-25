@@ -51,7 +51,7 @@ var eventConnectionsCmd = &cobra.Command{
 		}
 
 		t := table.NewWriter()
-		t.SetStyle(table.StyleColoredDark)
+		t.SetStyle(StyleDefault)
 		t.SetColumnConfigs(configs)
 		t.SetOutputMirror(cmd.OutOrStdout())
 

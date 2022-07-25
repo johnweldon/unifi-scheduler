@@ -46,7 +46,7 @@ var clientListCmd = &cobra.Command{
 		}
 
 		t := table.NewWriter()
-		t.SetStyle(table.StyleColoredDark)
+		t.SetStyle(StyleDefault)
 		t.SetColumnConfigs(configs)
 		t.SetOutputMirror(cmd.OutOrStdout())
 
@@ -77,3 +77,4 @@ func init() { // nolint: gochecknoinits
 
 	clientListCmd.Flags().BoolVar(&all, "all", all, "show all clients")
 }
+
