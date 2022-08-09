@@ -24,7 +24,8 @@ func (d Duration) String() string {
 	return humanize.Time(time.Now().Add(-time.Second * time.Duration(d)))
 }
 
-func (t TimeStamp) String() string { return humanize.Time(time.UnixMilli(int64(t))) }
+func (t TimeStamp) String() string    { return humanize.Time(time.UnixMilli(int64(t))) }
+func (t TimeStamp) ShortTime() string { return time.UnixMilli(int64(t)).Format("03:04:05PM") }
 
 func (lhs IP) Less(rhs IP) bool {
 	if len(rhs) == 0 {

@@ -40,9 +40,10 @@ var eventConnectionsCmd = &cobra.Command{
 		configs := []table.ColumnConfig{
 			{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
 			{Name: "Event"},
-			{Name: "To"},
 			{Name: "From"},
+			{Name: "To"},
 			{Name: "When"},
+			{Name: "Ago"},
 		}
 
 		headerRow := table.Row{}
@@ -88,7 +89,7 @@ var eventConnectionsCmd = &cobra.Command{
 					}
 
 					t.AppendRow([]interface{}{
-						name, evt, to, from, event.TimeStamp.String(),
+						name, evt, from, to, event.TimeStamp.ShortTime(), event.TimeStamp.String(),
 					})
 				}
 			}
