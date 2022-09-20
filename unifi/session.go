@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -529,7 +528,7 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 		s.csrf = tok
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.setError(err)
 

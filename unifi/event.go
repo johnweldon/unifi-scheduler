@@ -108,6 +108,8 @@ type Event struct {
 	VLAN               int64     `json:"vlan,omitempty"`
 }
 
+func (e Event) UniqueID() string { return e.ID }
+
 func (e Event) String() string {
 	const maxMsgLen = 100
 

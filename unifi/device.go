@@ -125,6 +125,8 @@ type Device struct {
 	XHasSSHHostKey           bool `json:"x_has_ssh_hostkey,omitempty"`
 }
 
+func (d *Device) UniqueID() string { return d.ID }
+
 func (d *Device) String() string {
 	traffic := ""
 	if d.BytesReceived+d.BytesSent > 0 {

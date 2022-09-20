@@ -2,7 +2,6 @@ package unifi
 
 import (
 	"encoding/json"
-	"math"
 	"net"
 	"strconv"
 	"time"
@@ -92,27 +91,6 @@ func (n *Number) UnmarshalJSON(b []byte) error {
 	*n = Number(i)
 
 	return nil
-}
-
-// nolint: gochecknoglobals
-var (
-	suffixes = []string{"B", "KB", "MB", "GB", "TB"}
-)
-
-// nolint: gomnd
-func round(val, roundOn float64, places int) float64 {
-	var round float64
-
-	pow := math.Pow(10, float64(places))
-	digit := pow * val
-
-	if _, div := math.Modf(digit); div >= roundOn {
-		round = math.Ceil(digit)
-	} else {
-		round = math.Floor(digit)
-	}
-
-	return round / pow
 }
 
 // nolint: gomnd
