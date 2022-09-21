@@ -7,7 +7,12 @@ ifeq ($(BUILD_VERSION),)
 endif
 
 .PHONY: all
-all: image
+all: clean push
+
+.PHONY: clean
+clean:
+	go clean .
+	-rm -rf vendor
 
 .PHONY: vendor
 vendor:
