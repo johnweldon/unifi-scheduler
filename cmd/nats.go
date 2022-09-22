@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/spf13/cobra"
 
@@ -35,15 +36,7 @@ var natsAgentCmd = &cobra.Command{
 		a := nats.NewAgent(ses, baseSubject, opts...)
 		cobra.CheckErr(a.Start(ctx))
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-time.After(1 * time.Minute):
-				fmt.Fprintf(cmd.OutOrStdout(), ".")
-			}
-		}
+		cobra.CheckErr(http.ListenAndServe(":7777", nil))
 	},
 }
 
