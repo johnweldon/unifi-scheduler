@@ -83,8 +83,8 @@ func (n *Client) ensureStreams() error {
 
 		if _, err = js.UpdateStream(&nats.StreamConfig{
 			Name:       stream,
+			Subjects:   []string{fmt.Sprintf("%s.*", stream)},
 			Duplicates: 1 * time.Hour,
-			NoAck:      true,
 		}); err != nil {
 			return fmt.Errorf("ensureStreams: updating stream %q: %w", stream, err)
 		}

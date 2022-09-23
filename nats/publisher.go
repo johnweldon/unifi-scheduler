@@ -3,6 +3,7 @@ package nats
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/nats-io/nats.go"
 )
@@ -21,8 +22,8 @@ func (n *Publisher) Store(bucket, key string, val any) error { return n.store(bu
 
 func (n *Publisher) Publish(subject string, msg any) error { return n.publish(subject, msg) }
 
-func (n *Publisher) PublishStream(subject string, msg any) error {
-	return n.publishStream(subject, msg)
+func (n *Publisher) PublishStream(stream, subject string, msg any) error {
+	return n.publishStream(fmt.Sprintf("%s.%s", stream, subject), msg)
 }
 
 func (n *Publisher) publish(subject string, msg any) error {
@@ -57,7 +58,12 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		return fmt.Errorf("publishStream: not connected: %w", err)
 	}
 
-	if js, err = n.conn.JetStream(); err != nil {
+	if js, err = n.conn.JetStream(
+		nats.PublishAsyncErrHandler(func(j nats.JetStream, m *nats.Msg, e error) {
+			log.Printf("ERROR!!! %v: %v / %v", e, j, m)
+		}),
+		nats.PublishAsyncMaxPending(10),
+	); err != nil {
 		return fmt.Errorf("publishStream: cannot get jetstream: %w", err)
 	}
 
@@ -76,7 +82,7 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		Data:    data,
 	}
 
-	if _, err = js.PublishMsgAsync(pmsg); err != nil {
+	if _, err = js.PublishMsg(pmsg); err != nil {
 		return fmt.Errorf("publishStream: cannot publish data: %w", err)
 	}
 

@@ -102,7 +102,7 @@ func (a *Agent) publishEvents() error {
 	}
 
 	for _, evt := range events {
-		if err = a.publishStream(eventStream(a.base), evt); err != nil {
+		if err = a.publishStream(eventStream(a.base), string(evt.Key), evt); err != nil {
 			return fmt.Errorf("publish events: %w", err)
 		}
 	}
@@ -202,8 +202,8 @@ func (a *Agent) publish(subject string, msg any) error {
 	return nil
 }
 
-func (a *Agent) publishStream(stream string, msg any) error {
-	if err := a.publisher.PublishStream(stream, msg); err != nil {
+func (a *Agent) publishStream(stream, subject string, msg any) error {
+	if err := a.publisher.PublishStream(stream, subject, msg); err != nil {
 		return fmt.Errorf("publish stream %q: %w", stream, err)
 	}
 
