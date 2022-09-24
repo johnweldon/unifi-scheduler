@@ -12,12 +12,31 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/johnweldon/unifi-scheduler/nats"
+	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/unifi/display"
 )
 
 var natsCmd = &cobra.Command{
 	Use:     "nats",
 	Aliases: []string{"nts", "n"},
 	Short:   "nats tools",
+}
+
+const baseSubject = "unifi"
+
+var natsClientsCmd = &cobra.Command{
+	Use:     "clients",
+	Aliases: []string{"client", "cl", "c"},
+	Short:   "nats client",
+	Run: func(cmd *cobra.Command, args []string) {
+		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL)}
+		s := nats.NewSubscriber(opts...)
+
+		var into []unifi.Client
+		cobra.CheckErr(s.Get(baseSubject+"-details", "active", &into))
+
+		display.ClientsTable(cmd.OutOrStdout(), into).Render()
+	},
 }
 
 var natsAgentCmd = &cobra.Command{
@@ -29,8 +48,6 @@ var natsAgentCmd = &cobra.Command{
 
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
-
-		baseSubject := "unifi"
 
 		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL)}
 
@@ -67,5 +84,6 @@ func init() { // nolint: gochecknoinits
 	_ = cobra.MarkFlagRequired(pf, natsURLFlag)
 
 	natsCmd.AddCommand(natsAgentCmd)
+	natsCmd.AddCommand(natsClientsCmd)
 	rootCmd.AddCommand(natsCmd)
 }

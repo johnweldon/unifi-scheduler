@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 
 	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/unifi/display"
 )
 
 var eventConnectionsCmd = &cobra.Command{
@@ -32,71 +29,7 @@ var eventConnectionsCmd = &cobra.Command{
 			return string(mac), false
 		}
 
-		getName := func(mac unifi.MAC) string {
-			name, _ := checkGetName(mac)
-			return name
-		}
-
-		configs := []table.ColumnConfig{
-			{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
-			{Name: "Event"},
-			{Name: "From"},
-			{Name: "To"},
-			{Name: "When"},
-			{Name: "Ago"},
-		}
-
-		headerRow := table.Row{}
-		for _, c := range configs {
-			headerRow = append(headerRow, c.Name)
-		}
-
-		t := table.NewWriter()
-		t.SetStyle(StyleDefault)
-		t.SetColumnConfigs(configs)
-		t.SetOutputMirror(cmd.OutOrStdout())
-
-		t.AppendHeader(headerRow)
-		for _, event := range events {
-			var (
-				name string
-				ok   bool
-			)
-
-			for _, mac := range []unifi.MAC{
-				event.User,
-				event.Client,
-				event.Guest,
-			} {
-				if name, ok = checkGetName(mac); ok {
-					evt := event.Key[7:]
-
-					to := "-"
-					from := "-"
-					switch event.Key {
-					case unifi.EventTypeWirelessUserRoam:
-						to = getName(event.AccessPointTo)
-						from = getName(event.AccessPointFrom)
-					case
-						unifi.EventTypeWirelessGuestDisconnected,
-						unifi.EventTypeWirelessUserDisconnected:
-						from = getName(event.AccessPoint)
-					case unifi.EventTypeWirelessUserConnected:
-						to = getName(event.AccessPoint)
-					case unifi.EventTypeWirelessUserRoamRadio:
-						from = fmt.Sprintf("%s (%d)", event.RadioFrom, event.ChannelFrom)
-						to = fmt.Sprintf("%s (%d)", event.RadioTo, event.ChannelTo)
-					}
-
-					t.AppendRow([]interface{}{
-						name, evt, from, to, event.TimeStamp.ShortTime(), event.TimeStamp.String(),
-					})
-				}
-			}
-		}
-		t.AppendFooter(table.Row{fmt.Sprintf("Total %d", t.Length())})
-
-		t.Render()
+		display.EventsTable(cmd.OutOrStdout(), checkGetName, events).Render()
 	},
 }
 
