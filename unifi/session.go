@@ -353,6 +353,11 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 		return nil, fmt.Errorf("unmarshalling events: %w", err)
 	}
 
+	const maxRecent = 500
+	if !all && eresp.Meta.Count > maxRecent {
+		return eresp.Data[:maxRecent], nil
+	}
+
 	return eresp.Data, nil
 }
 

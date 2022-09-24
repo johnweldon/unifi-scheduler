@@ -107,6 +107,10 @@ func (a *Agent) publishEvents() error {
 		}
 	}
 
+	if err = a.store(detailBucket(a.base), "events", events); err != nil {
+		return fmt.Errorf("persisting recent events: %w", err)
+	}
+
 	return nil
 }
 
@@ -162,6 +166,10 @@ func (a *Agent) refreshDevices() error {
 		if err = a.store(detailBucket(a.base), mac, device); err != nil {
 			return fmt.Errorf("persisting device %q: %w", mac, err)
 		}
+	}
+
+	if err = a.store(detailBucket(a.base), "devices", devices); err != nil {
+		return fmt.Errorf("persisting devices: %w", err)
 	}
 
 	return nil
