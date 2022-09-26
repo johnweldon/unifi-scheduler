@@ -7,7 +7,10 @@ ifeq ($(BUILD_VERSION),)
 endif
 
 .PHONY: all
-all: clean push
+all: build
+
+.PHONY: build
+build: clean $(NAME)
 
 .PHONY: clean
 clean:
@@ -28,4 +31,11 @@ push: vendor
 		--platform $(PLATFORMS) \
 		--push \
 		.
+
+$(NAME):
+	go build \
+		-tags=netgo \
+		-ldflags '-s -w -extldflags "-static"' \
+		-ldflags "-X main.version=$(BUILD_VERSION)" \
+		-o $(NAME) .
 

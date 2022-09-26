@@ -16,6 +16,8 @@ var (
 	username string
 	password string
 	endpoint string
+
+	Version string
 )
 
 var rootCmd = &cobra.Command{
@@ -24,7 +26,17 @@ var rootCmd = &cobra.Command{
 	Short:   "utility for interacting with unifi",
 }
 
-func Execute() {
+var versionCmd = &cobra.Command{
+	Use:     "version",
+	Aliases: []string{"ver", "v"},
+	Short:   "application version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\n", Version)
+	},
+}
+
+func Execute(version string) {
+	Version = version
 	cobra.CheckErr(rootCmd.Execute())
 }
 
@@ -43,6 +55,8 @@ func init() { // nolint: gochecknoinits
 
 	pf.StringVar(&endpoint, endpointFlag, endpoint, "unifi endpoint")
 	_ = cobra.MarkFlagRequired(pf, endpointFlag)
+
+	rootCmd.AddCommand(versionCmd)
 }
 
 func initConfig() {

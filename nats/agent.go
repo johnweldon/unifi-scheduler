@@ -13,8 +13,8 @@ import (
 
 func NewAgent(s *unifi.Session, base string, opts ...ClientOpt) *Agent {
 	addnl := []ClientOpt{
-		OptBuckets(detailBucket(base), byMACBucket(base), byNameBucket(base)),
-		OptStreams(eventStream(base)),
+		OptBuckets(DetailBucket(base), ByMACBucket(base), ByNameBucket(base)),
+		OptStreams(EventStream(base)),
 	}
 
 	return &Agent{
@@ -102,12 +102,12 @@ func (a *Agent) publishEvents() error {
 	}
 
 	for _, evt := range events {
-		if err = a.publishStream(eventStream(a.base), string(evt.Key), evt); err != nil {
+		if err = a.publishStream(EventStream(a.base), string(evt.Key), evt); err != nil {
 			return fmt.Errorf("publish events: %w", err)
 		}
 	}
 
-	if err = a.store(detailBucket(a.base), "events", events); err != nil {
+	if err = a.store(DetailBucket(a.base), EventsKey, events); err != nil {
 		return fmt.Errorf("persisting recent events: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func (a *Agent) refreshClients() error {
 		return err
 	}
 
-	if err = a.store(detailBucket(a.base), "active", clients); err != nil {
+	if err = a.store(DetailBucket(a.base), ActiveKey, clients); err != nil {
 		return fmt.Errorf("persisting live clients: %w", err)
 	}
 
@@ -143,7 +143,7 @@ func (a *Agent) refreshUsers() error {
 
 	for _, user := range users {
 		mac := string(user.MAC)
-		if err = a.store(detailBucket(a.base), mac, user); err != nil {
+		if err = a.store(DetailBucket(a.base), mac, user); err != nil {
 			return fmt.Errorf("persisting user %q: %w", mac, err)
 		}
 	}
@@ -157,18 +157,18 @@ func (a *Agent) refreshDevices() error {
 		return fmt.Errorf("get devices: %w", err)
 	}
 
-	if err = a.publish("devices", devices); err != nil {
+	if err = a.publish(DevicesSubject, devices); err != nil {
 		return err
 	}
 
 	for _, device := range devices {
 		mac := string(device.MAC)
-		if err = a.store(detailBucket(a.base), mac, device); err != nil {
+		if err = a.store(DetailBucket(a.base), mac, device); err != nil {
 			return fmt.Errorf("persisting device %q: %w", mac, err)
 		}
 	}
 
-	if err = a.store(detailBucket(a.base), "devices", devices); err != nil {
+	if err = a.store(DetailBucket(a.base), DevicesKey, devices); err != nil {
 		return fmt.Errorf("persisting devices: %w", err)
 	}
 
@@ -183,7 +183,7 @@ func (a *Agent) refreshLookups() error {
 
 	for k, v := range macs {
 		mac := string(k)
-		if err = a.store(byMACBucket(a.base), mac, v); err != nil {
+		if err = a.store(ByMACBucket(a.base), mac, v); err != nil {
 			return fmt.Errorf("persisting MAC names %q: %w", mac, err)
 		}
 	}
@@ -194,7 +194,7 @@ func (a *Agent) refreshLookups() error {
 	}
 
 	for k, v := range names {
-		if err = a.store(byNameBucket(a.base), k, v); err != nil {
+		if err = a.store(ByNameBucket(a.base), k, v); err != nil {
 			return fmt.Errorf("persisting name MACs %q: %w", k, err)
 		}
 	}
@@ -219,7 +219,7 @@ func (a *Agent) publishStream(stream, subject string, msg any) error {
 }
 
 func (a *Agent) store(bucket, key string, val any) error {
-	norm := normalize(key)
+	norm := NormalizeKey(key)
 	if norm == "" {
 		return nil
 	}
@@ -231,13 +231,21 @@ func (a *Agent) store(bucket, key string, val any) error {
 	return nil
 }
 
-func detailBucket(base string) string        { return base + "-details" }
-func byMACBucket(base string) string         { return base + "-bymac" }
-func byNameBucket(base string) string        { return base + "-byname" }
-func eventStream(base string) string         { return base + "-events" }
+const (
+	ActiveKey  = "active"
+	DevicesKey = "devices"
+	EventsKey  = "events"
+
+	DevicesSubject = "devices"
+)
+
+func DetailBucket(base string) string        { return base + "-details" }
+func ByMACBucket(base string) string         { return base + "-bymac" }
+func ByNameBucket(base string) string        { return base + "-byname" }
+func EventStream(base string) string         { return base + "-events" }
 func subSubject(base, subject string) string { return strings.Join([]string{base, subject}, ".") }
 
-func normalize(s string) string {
+func NormalizeKey(s string) string {
 	fn := func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z':

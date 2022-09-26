@@ -2,6 +2,7 @@ package unifi
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -124,4 +125,47 @@ func (e Event) String() string {
 		e.DateTime,
 		msg,
 	)
+}
+
+var (
+	DefaultEventSort = EventOrderedBy(eventTime)
+
+	eventTime = func(lhs, rhs *Event) bool { return lhs.DateTime.Before(rhs.DateTime) }
+)
+
+// EventOrderedBy returns a EventSorter that sorts by the provided less functions.
+func EventOrderedBy(less ...EventLessFn) *EventSorter {
+	return &EventSorter{less: less}
+}
+
+// EventLessFn describes a less function for a Event.
+type EventLessFn func(lhs, rhs *Event) bool
+
+// EventSorter is a multisorter for sorting slices of Event.
+type EventSorter struct {
+	events []Event
+	less   []EventLessFn
+}
+
+// Sort applies the configured less functions in order.
+func (s *EventSorter) Sort(events []Event) {
+	s.events = events
+	sort.Sort(s)
+}
+
+func (s *EventSorter) Len() int      { return len(s.events) }
+func (s *EventSorter) Swap(i, j int) { s.events[i], s.events[j] = s.events[j], s.events[i] }
+func (s *EventSorter) Less(i, j int) bool {
+	lhs, rhs := &s.events[i], &s.events[j]
+	var k int
+	for k = 0; k < len(s.less)-1; k++ {
+		less := s.less[k]
+		switch {
+		case less(lhs, rhs):
+			return true
+		case less(rhs, lhs):
+			return false
+		}
+	}
+	return s.less[k](lhs, rhs)
 }
