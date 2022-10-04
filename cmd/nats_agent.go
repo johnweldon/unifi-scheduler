@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/johnweldon/unifi-scheduler/nats"
+	"github.com/johnweldon/unifi-scheduler/pkg/nats"
 )
 
 var natsAgentCmd = &cobra.Command{

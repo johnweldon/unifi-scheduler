@@ -6,7 +6,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
 type Renderer interface {

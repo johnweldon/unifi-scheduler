@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
 var (

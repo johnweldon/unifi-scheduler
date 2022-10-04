@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
 var lookupCmd = &cobra.Command{

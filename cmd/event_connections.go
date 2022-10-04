@@ -3,8 +3,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/johnweldon/unifi-scheduler/unifi"
-	"github.com/johnweldon/unifi-scheduler/unifi/display"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
 
 var eventConnectionsCmd = &cobra.Command{

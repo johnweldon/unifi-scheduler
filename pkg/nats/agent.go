@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/johnweldon/unifi-scheduler/unifi"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
 func NewAgent(s *unifi.Session, base string, opts ...ClientOpt) *Agent {

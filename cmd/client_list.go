@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/johnweldon/unifi-scheduler/unifi/display"
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
 
 var all bool
