@@ -133,8 +133,6 @@ github.com/jedib0t/go-pretty/v6 v6.3.9 h1:GAK/1WJY9WVVrKd601HGB89ihLBDfJnUIJye31
 github.com/jedib0t/go-pretty/v6 v6.3.9/go.mod h1:MgmISkTWDSFu0xOqiZ0mKNntMQ2mDgOcwOkwBEkMDJI=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/XSXhF0NWZEnDohbsk=
-github.com/jw4/x v0.0.0-20220714200530-a49fd22d4ffa h1:492xK0Axtj3INBNcFFJPUMnJ70UkCjSRHAK6DfaSJWQ=
-github.com/jw4/x v0.0.0-20220714200530-a49fd22d4ffa/go.mod h1:S48QSGgGgn5RtO208Ip0R0i5qJZBQC9HHlKXANkLdFY=
 github.com/jw4/x v0.0.0-20221121232821-a6ac3e247485 h1:V14CV61KD0DQeG5kXUdH0wJA11vFNUJoew8jr+NqWuc=
 github.com/jw4/x v0.0.0-20221121232821-a6ac3e247485/go.mod h1:S48QSGgGgn5RtO208Ip0R0i5qJZBQC9HHlKXANkLdFY=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
