@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/jedib0t/go-pretty/v6 v6.3.9
-	github.com/jw4/x v0.0.0-20220714200530-a49fd22d4ffa
+	github.com/jw4/x v0.0.0-20221121232821-a6ac3e247485
 	github.com/nats-io/nats.go v1.17.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5

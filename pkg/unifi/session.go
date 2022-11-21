@@ -10,9 +10,11 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"text/template"
 	"time"
 
 	"github.com/jw4/x/stringset"
+	"github.com/jw4/x/transport"
 )
 
 // Session wraps metadata to manage session state.
@@ -74,8 +76,9 @@ func (s *Session) Initialize(writers ...io.Writer) error {
 	}
 
 	s.client = &http.Client{ // nolint:exhaustivestruct
-		Jar:     jar,
-		Timeout: time.Minute * 1,
+		Jar:       jar,
+		Timeout:   time.Minute * 1,
+		Transport: transport.NewLoggingTransport(http.DefaultTransport, transport.LoggingOutput(nil)),
 	}
 	s.login = s.webLogin
 
@@ -264,6 +267,28 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	return ret, nil
 }
 
+func (s *Session) getUserByMac(mac string) (*Client, error) {
+	var (
+		err  error
+		data string
+		resp ClientResponse
+	)
+
+	if data, err = s.GetUserByMAC(mac); err != nil {
+		return nil, fmt.Errorf("retrieving user by mac: %w", err)
+	}
+
+	if err = json.Unmarshal([]byte(data), &resp); err != nil {
+		return nil, fmt.Errorf("unmarshalling user: %w", err)
+	}
+
+	if len(resp.Data) < 1 {
+		return nil, fmt.Errorf("zero results: %s", data)
+	}
+
+	return &resp.Data[0], nil
+}
+
 func (s *Session) getClients(all bool) ([]Client, error) {
 	var (
 		devices map[string]Device
@@ -377,6 +402,25 @@ func (s *Session) ListAllEvents() (string, error) {
 // ListUsers describes the known UniFi clients.
 func (s *Session) ListUsers() (string, error) { return s.action(http.MethodGet, "/rest/user", nil) }
 
+// GetUser returns user info.
+func (s *Session) GetUser(id string) (string, error) {
+	return s.action(http.MethodGet, "/rest/user/"+id, nil)
+}
+
+// GetUserByMAC returns user info.
+func (s *Session) GetUserByMAC(mac string) (string, error) {
+	return s.action(http.MethodGet, "/rest/user/?mac="+mac, nil)
+}
+
+func (s *Session) SetUserDetails(mac, name, ip string) (string, error) {
+	user, err := s.getUserByMac(mac)
+	if err != nil {
+		return "", err
+	}
+
+	return s.setUserDetails(user.ID, name, ip)
+}
+
 // ListClients describes currently connected clients.
 func (s *Session) ListClients() (string, error) { return s.action(http.MethodGet, "/stat/sta", nil) }
 
@@ -474,6 +518,33 @@ func (s *Session) macAction(action, mac MAC) (string, error) {
 	return s.action(http.MethodPost, "/cmd/stamgr", r)
 }
 
+func (s *Session) setUserDetails(id, name, ip string) (string, error) {
+	if len(id) == 0 {
+		return "", fmt.Errorf("missing user id")
+	}
+
+	tmpl, err := template.New("").Parse(`{ {{- /**/ -}}
+  "local_dns_record_enabled":false,{{- /**/ -}}
+  "local_dns_record":"",{{- /**/ -}}
+  "name":"{{ with .Name }}{{ . }}{{ end }}",{{- /**/ -}}
+  "usergroup_id":"{{ with .UsergroupID }}{{ . }}{{ end }}",{{- /**/ -}}
+  "use_fixedip":{{ with .IP }}true{{ else }}false{{ end }},{{- /**/ -}}
+  "network_id":"{{ with .NetworkID }}{{ . }}{{ end }}",{{- /**/ -}}
+  "fixed_ip":"{{ with .IP }}{{ . }}{{ end }}"{{- /**/ -}}
+}`)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+
+	if err = tmpl.Execute(&buf, map[string]string{"Name": name, "IP": ip, "NetworkID": "5c82f1ce2679fb00116fb58e"}); err != nil {
+		return "", err
+	}
+
+	return s.action(http.MethodPut, "/rest/user/"+id, &buf)
+}
+
 func (s *Session) action(method, path string, body io.Reader) (string, error) {
 	if s.err != nil {
 		return "", s.err
@@ -491,6 +562,8 @@ func (s *Session) action(method, path string, body io.Reader) (string, error) {
 		return s.get(u)
 	case http.MethodPost:
 		return s.post(u, body)
+	case http.MethodPut:
+		return s.put(u, body)
 	default:
 		return "", fmt.Errorf("unconfigured method: %q", method)
 	}
@@ -502,6 +575,10 @@ func (s *Session) get(u fmt.Stringer) (string, error) {
 
 func (s *Session) post(u fmt.Stringer, body io.Reader) (string, error) {
 	return s.verb("POST", u, body)
+}
+
+func (s *Session) put(u fmt.Stringer, body io.Reader) (string, error) {
+	return s.verb("PUT", u, body)
 }
 
 func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, error) {

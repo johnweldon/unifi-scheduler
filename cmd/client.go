@@ -6,7 +6,7 @@ import (
 
 var clientCmd = &cobra.Command{
 	Use:     "client",
-	Aliases: []string{"cl", "user", "clients", "users"},
+	Aliases: []string{"cl", "clients"},
 	Short:   "interact with client specific endpoints",
 }
 
