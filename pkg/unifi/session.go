@@ -34,27 +34,26 @@ type Session struct {
 
 	outWriter io.Writer
 	errWriter io.Writer
+	dbgWriter io.Writer
 }
 
+type Option func(*Session)
+
+func WithOut(o io.Writer) Option { return func(s *Session) { s.outWriter = o } }
+func WithErr(e io.Writer) Option { return func(s *Session) { s.errWriter = e } }
+func WithDbg(d io.Writer) Option { return func(s *Session) { s.dbgWriter = d } }
+
 // Initialize prepares the session for use.
-func (s *Session) Initialize(writers ...io.Writer) error {
+func (s *Session) Initialize(options ...Option) error {
 	if s == nil {
 		return ErrNilSession
 	}
 
-	// nolint: gomnd
-	switch len(writers) {
-	case 2:
-		s.outWriter = writers[0]
-		s.errWriter = writers[1]
-	case 1:
-		s.outWriter = writers[0]
-		s.errWriter = os.Stderr
-	case 0:
-		s.outWriter = os.Stdout
-		s.errWriter = os.Stderr
-	default:
-		return ErrTooManyWriters
+	s.outWriter = os.Stdout
+	s.errWriter = os.Stderr
+
+	for _, option := range options {
+		option(s)
 	}
 
 	s.err = nil
@@ -79,8 +78,9 @@ func (s *Session) Initialize(writers ...io.Writer) error {
 	s.client = &http.Client{ // nolint:exhaustivestruct
 		Jar:       jar,
 		Timeout:   time.Minute * 1,
-		Transport: transport.NewLoggingTransport(http.DefaultTransport, transport.LoggingOutput(nil)),
+		Transport: transport.NewLoggingTransport(http.DefaultTransport, transport.LoggingOutput(s.dbgWriter)),
 	}
+
 	s.login = s.webLogin
 
 	return s.err

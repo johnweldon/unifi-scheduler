@@ -13,6 +13,7 @@ import (
 
 var (
 	cfgFile  string
+	debug    bool
 	username string
 	password string
 	endpoint string
@@ -46,6 +47,7 @@ func init() { // nolint: gochecknoinits
 	pf := rootCmd.PersistentFlags()
 
 	pf.StringVar(&cfgFile, "config", "", "config file (default is $HOME/.unifi-scheduler.yaml)")
+	pf.BoolVar(&debug, "debug", debug, "debug output")
 
 	pf.StringVar(&username, usernameFlag, username, "unifi username")
 	_ = cobra.MarkFlagRequired(pf, usernameFlag)
@@ -117,7 +119,16 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		Password: password,
 	}
 
-	if err := ses.Initialize(cmd.ErrOrStderr()); err != nil {
+	options := []unifi.Option{
+		unifi.WithOut(cmd.OutOrStderr()),
+		unifi.WithErr(cmd.ErrOrStderr()),
+	}
+
+	if debug {
+		options = append(options, unifi.WithDbg(cmd.OutOrStderr()))
+	}
+
+	if err := ses.Initialize(options...); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "error initializing: %v\n", err)
 
 		return nil, err
