@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -437,6 +438,9 @@ func (s *Session) Block(mac MAC) (string, error) { return s.macAction("block-sta
 // Unblock re-enables a specific client.
 func (s *Session) Unblock(mac MAC) (string, error) { return s.macAction("unblock-sta", mac) }
 
+// Forget removes record of a specific list of MAC addresses.
+func (s *Session) Forget(macs []MAC) (string, error) { return s.macsAction("forget-sta", macs) }
+
 func (s *Session) BlockFn(clients []Client, keys map[string]bool) {
 	for _, client := range clients {
 		display := firstNonEmpty(client.Name, client.Hostname)
@@ -469,6 +473,25 @@ func (s *Session) UnblockFn(clients []Client, keys map[string]bool) {
 	}
 }
 
+func (s *Session) ForgetFn(clients []Client, keys map[string]bool) {
+	var macs []MAC
+	for _, client := range clients {
+		display := firstNonEmpty(client.Name, client.Hostname)
+		if k, ok := keys[display]; ok && k {
+			macs = append(macs, client.MAC)
+		}
+	}
+
+	res, err := s.Forget(macs)
+	if err != nil {
+		fmt.Fprintf(s.errWriter, "%s\nerror forgetting: %v\n", res, err)
+
+		return
+	}
+
+	fmt.Fprintf(s.outWriter, "%s\n", res)
+}
+
 func (s *Session) webLogin() (string, error) {
 	if s.err != nil {
 		return "", s.err
@@ -481,12 +504,9 @@ func (s *Session) webLogin() (string, error) {
 		return "", s.err
 	}
 
-	r := bytes.NewBufferString(
-		fmt.Sprintf(
-			`{"username":%q,"password":%q,"strict":"true","remember":"true"}`,
-			s.Username, s.Password))
+	payload := fmt.Sprintf(`{"username":%q,"password":%q,"strict":"true","remember":"true"}`, s.Username, s.Password)
 
-	respBody, err := s.post(u, r)
+	respBody, err := s.post(u, bytes.NewBufferString(payload))
 	if err == nil {
 		s.login = func() (string, error) { return respBody, nil }
 	}
@@ -512,10 +532,25 @@ func (s *Session) buildURL(path string) (*url.URL, error) {
 	return url.Parse(fmt.Sprintf("%s%s/api/s/%s%s", s.Endpoint, pathPrefix, site, path))
 }
 
-func (s *Session) macAction(action, mac MAC) (string, error) {
-	r := bytes.NewBufferString(fmt.Sprintf(`{"cmd":%q,"mac":%q}`, action, mac))
+func (s *Session) macAction(action string, mac MAC) (string, error) {
+	payload := fmt.Sprintf(`{"cmd":%q,"mac":%q}`, action, mac)
 
-	return s.action(http.MethodPost, "/cmd/stamgr", r)
+	return s.action(http.MethodPost, "/cmd/stamgr", bytes.NewBufferString(payload))
+}
+
+func (s *Session) macsAction(action string, macs []MAC) (string, error) {
+	if len(macs) == 0 {
+		return "", nil
+	}
+
+	var allmacs []string
+	for _, mac := range macs {
+		allmacs = append(allmacs, fmt.Sprintf("%q", mac))
+	}
+
+	payload := fmt.Sprintf(`{"cmd":%q,"macs":[%s]}`, action, strings.Join(allmacs, ","))
+
+	return s.action(http.MethodPost, "/cmd/stamgr", bytes.NewBufferString(payload))
 }
 
 func (s *Session) setUserDetails(id, name, ip string) (string, error) {
