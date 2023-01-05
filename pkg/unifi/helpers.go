@@ -26,6 +26,14 @@ func (d Duration) String() string {
 func (t TimeStamp) String() string    { return humanize.Time(time.UnixMilli(int64(t))) }
 func (t TimeStamp) ShortTime() string { return time.UnixMilli(int64(t)).Format("03:04:05PM") }
 
+func (m MAC) String() string {
+	if len(m) == 0 {
+		return "00:00:00:00:00:00"
+	}
+
+	return string(m)
+}
+
 func (lhs IP) Less(rhs IP) bool {
 	if len(rhs) == 0 {
 		return false

@@ -6,7 +6,7 @@ import (
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
 
-var all bool
+var allClients bool
 
 var clientListCmd = &cobra.Command{
 	Use:     "list",
@@ -17,7 +17,7 @@ var clientListCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		fetch := ses.GetClients
-		if all {
+		if allClients {
 			fetch = ses.GetUsers
 		}
 
@@ -31,5 +31,5 @@ var clientListCmd = &cobra.Command{
 func init() { // nolint: gochecknoinits
 	clientCmd.AddCommand(clientListCmd)
 
-	clientListCmd.Flags().BoolVar(&all, "all", all, "show all clients")
+	clientListCmd.Flags().BoolVar(&allClients, "all", allClients, "show all clients")
 }

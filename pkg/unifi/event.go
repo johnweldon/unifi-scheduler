@@ -9,15 +9,19 @@ import (
 type EventType string
 
 var (
+	EventTypeADScheduleUpgradeFailedNotFound = EventType("EVT_AD_ScheduleUpgradeFailedNotFound")
+	EventTypeAccessPointAdopted              = EventType("EVT_AP_Adopted")
 	EventTypeAccessPointAutoReadopted        = EventType("EVT_AP_AutoReadopted")
 	EventTypeAccessPointChannelChanged       = EventType("EVT_AP_ChannelChanged")
 	EventTypeAccessPointConnected            = EventType("EVT_AP_Connected")
+	EventTypeAccessPointDeleted              = EventType("EVT_AP_Deleted")
 	EventTypeAccessPointDetectRogueAP        = EventType("EVT_AP_DetectRogueAP")
 	EventTypeAccessPointIsolated             = EventType("EVT_AP_Isolated")
 	EventTypeAccessPointLostContact          = EventType("EVT_AP_Lost_Contact")
 	EventTypeAccessPointPossibleInterference = EventType("EVT_AP_PossibleInterference")
 	EventTypeAccessPointRestarted            = EventType("EVT_AP_Restarted")
 	EventTypeAccessPointRestartedUnknown     = EventType("EVT_AP_RestartedUnknown")
+	EventTypeAccessPointUpgradeFailed        = EventType("EVT_AP_UpgradeFailed")
 	EventTypeAccessPointUpgradeScheduled     = EventType("EVT_AP_UpgradeScheduled")
 	EventTypeAccessPointUpgraded             = EventType("EVT_AP_Upgraded")
 	EventTypeBridgeAutoReadopted             = EventType("EVT_BB_AutoReadopted")
@@ -27,19 +31,29 @@ var (
 	EventTypeBridgeLostContact               = EventType("EVT_BB_Lost_Contact")
 	EventTypeBridgeRestarted                 = EventType("EVT_BB_Restarted")
 	EventTypeBridgeRestartedUnknown          = EventType("EVT_BB_RestartedUnknown")
+	EventTypeBridgeUpgradeFailed             = EventType("EVT_BB_UpgradeFailed")
+	EventTypeBridgeUpgradeScheduled          = EventType("EVT_BB_UpgradeScheduled")
+	EventTypeBridgeUpgraded                  = EventType("EVT_BB_Upgraded")
 	EventTypeDMConnected                     = EventType("EVT_DM_Connected")
 	EventTypeDMUpgraded                      = EventType("EVT_DM_Upgraded")
+	EventTypeGatewayWANTransition            = EventType("EVT_GW_WANTransition")
 	EventTypeLANClientBlocked                = EventType("EVT_LC_Blocked")
 	EventTypeLANClientUnblocked              = EventType("EVT_LC_Unblocked")
 	EventTypeLANGuestConnected               = EventType("EVT_LG_Connected")
 	EventTypeLANGuestDisconnected            = EventType("EVT_LG_Disconnected")
 	EventTypeLANUserConnected                = EventType("EVT_LU_Connected")
+	EventTypeLANUserDisconnected             = EventType("EVT_LU_Disconnected")
 	EventTypeSwitchAutoReadopted             = EventType("EVT_SW_AutoReadopted")
 	EventTypeSwitchConnected                 = EventType("EVT_SW_Connected")
 	EventTypeSwitchDetectRogueDHCP           = EventType("EVT_SW_DetectRogueDHCP")
+	EventTypeSwitchFirmwareCheckFailed       = EventType("EVT_SW_FirmwareCheckFailed")
+	EventTypeSwitchFirmwareDownloadFailed    = EventType("EVT_SW_FirmwareDownloadFailed")
 	EventTypeSwitchLostContact               = EventType("EVT_SW_Lost_Contact")
+	EventTypeSwitchPOEDisconnect             = EventType("EVT_SW_PoeDisconnect")
 	EventTypeSwitchRestarted                 = EventType("EVT_SW_Restarted")
 	EventTypeSwitchRestartedUnknown          = EventType("EVT_SW_RestartedUnknown")
+	EventTypeSwitchSTPPortBlocking           = EventType("EVT_SW_StpPortBlocking")
+	EventTypeSwitchUpgradeFailed             = EventType("EVT_SW_UpgradeFailed")
 	EventTypeSwitchUpgradeScheduled          = EventType("EVT_SW_UpgradeScheduled")
 	EventTypeSwitchUpgraded                  = EventType("EVT_SW_Upgraded")
 	EventTypeWirelessClientBlocked           = EventType("EVT_WC_Blocked")
@@ -79,12 +93,15 @@ type Event struct {
 	Channel            string    `json:"channel,omitempty"`
 	ChannelFrom        Number    `json:"channel_from,omitempty"`
 	ChannelTo          Number    `json:"channel_to,omitempty"`
+	CurlStatus         string    `json:"curl_rc,omitempty"`
 	DMDisplay          string    `json:"dm_displayName,omitempty"`
 	DMModel            string    `json:"dm_model,omitempty"`
 	DMName             string    `json:"dm_name,omitempty"`
 	ESSID              string    `json:"essid,omitempty"`
 	GatewayDisplay     string    `json:"gw_displayName,omitempty"`
+	HTTPStatus         string    `json:"http_rc,omitempty"`
 	Hostname           string    `json:"hostname,omitempty"`
+	Interface          string    `json:"iface,omitempty"`
 	Message            string    `json:"msg,omitempty"`
 	Name               string    `json:"name,omitempty"`
 	Network            string    `json:"network,omitempty"`
@@ -94,6 +111,8 @@ type Event struct {
 	RogueChannel       string    `json:"rogue_channel,omitempty"`
 	SSID               string    `json:"ssid,omitempty"`
 	SiteID             string    `json:"site_id,omitempty"`
+	State              string    `json:"state,omitempty"`
+	Status             string    `json:"rc,omitempty"`
 	Subsystem          string    `json:"subsystem,omitempty"`
 	SwitchDisplay      string    `json:"sw_displayName,omitempty"`
 	SwitchModel        string    `json:"sw_model,omitempty"`

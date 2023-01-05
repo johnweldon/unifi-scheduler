@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -80,49 +81,150 @@ func EventsTable(out io.Writer, displayName func(unifi.MAC) (string, bool), even
 
 	t.AppendHeader(headerRow)
 
-	getName := func(mac unifi.MAC) string {
-		name, _ := displayName(mac)
-		return name
+	getName := func(macs ...unifi.MAC) string {
+		var names []string
+		for _, mac := range macs {
+			names = append(names, string(mac))
+
+			if name, ok := displayName(mac); ok {
+				return name
+			}
+		}
+
+		return strings.Join(names, ",")
 	}
 
 	for _, event := range events {
-		var (
-			name string
-			ok   bool
-		)
+		name := getName(event.MAC)
+		evt := event.Key[7:]
+		to := "-"
+		from := "-"
 
-		for _, mac := range []unifi.MAC{
-			event.User,
-			event.Client,
-			event.Guest,
-		} {
-			if name, ok = displayName(mac); ok {
-				evt := event.Key[7:]
+		switch event.Key {
 
-				to := "-"
-				from := "-"
-				switch event.Key {
-				case unifi.EventTypeWirelessUserRoam:
-					to = getName(event.AccessPointTo)
-					from = getName(event.AccessPointFrom)
-				case
-					unifi.EventTypeWirelessGuestDisconnected,
-					unifi.EventTypeWirelessUserDisconnected:
-					from = getName(event.AccessPoint)
-				case unifi.EventTypeWirelessUserConnected:
-					to = getName(event.AccessPoint)
-				case unifi.EventTypeWirelessUserRoamRadio:
-					from = fmt.Sprintf("%s (%d)", event.RadioFrom, event.ChannelFrom)
-					to = fmt.Sprintf("%s (%d)", event.RadioTo, event.ChannelTo)
-				}
+		case unifi.EventTypeWirelessUserRoam:
 
-				t.AppendRow([]interface{}{
-					name, evt, from, to, event.TimeStamp.ShortTime(), event.TimeStamp.String(),
-				})
-			}
+			to = getName(event.AccessPointTo)
+			from = getName(event.AccessPointFrom)
+			name = getName(event.User)
+
+		case unifi.EventTypeWirelessGuestDisconnected:
+
+			from = getName(event.AccessPoint)
+			name = getName(event.Guest)
+
+		case unifi.EventTypeWirelessUserDisconnected:
+
+			from = getName(event.AccessPoint)
+			name = getName(event.User)
+
+		case unifi.EventTypeWirelessUserConnected:
+
+			to = getName(event.AccessPoint)
+			name = getName(event.User)
+
+		case unifi.EventTypeWirelessUserRoamRadio:
+
+			from = fmt.Sprintf("%s (%d)", event.RadioFrom, event.ChannelFrom)
+			to = fmt.Sprintf("%s (%d)", event.RadioTo, event.ChannelTo)
+			name = getName(event.User)
+
+		case unifi.EventTypeLANUserConnected:
+
+			to = getName(event.Switch)
+			name = getName(event.User)
+
+		case unifi.EventTypeLANUserDisconnected:
+
+			from = getName(event.Switch)
+			name = getName(event.User)
+
+		case unifi.EventTypeLANGuestConnected:
+
+			to = getName(event.Switch)
+			name = getName(event.Guest)
+
+		case
+			unifi.EventTypeLANClientBlocked,
+			unifi.EventTypeLANClientUnblocked,
+			unifi.EventTypeWirelessClientBlocked,
+			unifi.EventTypeWirelessClientUnblocked:
+
+			name = getName(event.Client)
+
+		case
+			unifi.EventTypeAccessPointAdopted,
+			unifi.EventTypeAccessPointAutoReadopted,
+			unifi.EventTypeAccessPointChannelChanged,
+			unifi.EventTypeAccessPointConnected,
+			unifi.EventTypeAccessPointDeleted,
+			unifi.EventTypeAccessPointDetectRogueAP,
+			unifi.EventTypeAccessPointIsolated,
+			unifi.EventTypeAccessPointIsolated,
+			unifi.EventTypeAccessPointLostContact,
+			unifi.EventTypeAccessPointPossibleInterference,
+			unifi.EventTypeAccessPointRestarted,
+			unifi.EventTypeAccessPointRestartedUnknown,
+			unifi.EventTypeAccessPointUpgradeFailed,
+			unifi.EventTypeAccessPointUpgradeScheduled,
+			unifi.EventTypeAccessPointUpgraded:
+
+			name = getName(event.AccessPoint)
+
+		case
+			unifi.EventTypeBridgeAutoReadopted,
+			unifi.EventTypeBridgeChannelChanged,
+			unifi.EventTypeBridgeConnected,
+			unifi.EventTypeBridgeLinkRadioChanged,
+			unifi.EventTypeBridgeLostContact,
+			unifi.EventTypeBridgeRestarted,
+			unifi.EventTypeBridgeRestartedUnknown,
+			unifi.EventTypeBridgeUpgradeFailed,
+			unifi.EventTypeBridgeUpgradeScheduled,
+			unifi.EventTypeBridgeUpgraded:
+
+			name = getName(event.Bridge)
+
+		case
+			unifi.EventTypeDMConnected,
+			unifi.EventTypeDMUpgraded:
+
+			name = getName(event.DM)
+
+		case unifi.EventTypeGatewayWANTransition:
+
+			name = getName(event.Gateway)
+
+		case
+			unifi.EventTypeSwitchAutoReadopted,
+			unifi.EventTypeSwitchConnected,
+			unifi.EventTypeSwitchDetectRogueDHCP,
+			unifi.EventTypeSwitchFirmwareCheckFailed,
+			unifi.EventTypeSwitchFirmwareDownloadFailed,
+			unifi.EventTypeSwitchLostContact,
+			unifi.EventTypeSwitchPOEDisconnect,
+			unifi.EventTypeSwitchRestarted,
+			unifi.EventTypeSwitchRestartedUnknown,
+			unifi.EventTypeSwitchSTPPortBlocking,
+			unifi.EventTypeSwitchUpgradeFailed,
+			unifi.EventTypeSwitchUpgradeScheduled,
+			unifi.EventTypeSwitchUpgraded:
+
+			name = getName(event.Switch)
+
 		}
+
+		if name == "" {
+			name = string(event.Key)
+		}
+
+		t.AppendRow([]interface{}{
+			name, evt, from, to, event.TimeStamp.ShortTime(), event.TimeStamp.String(),
+		})
 	}
+
 	t.AppendFooter(table.Row{fmt.Sprintf("Total %d", t.Length())})
+
 	return t
 }
 

@@ -7,6 +7,8 @@ import (
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
 
+var allConnections bool
+
 var eventConnectionsCmd = &cobra.Command{
 	Use:     "connections",
 	Aliases: []string{"conns"},
@@ -15,7 +17,12 @@ var eventConnectionsCmd = &cobra.Command{
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
 
-		events, err := ses.GetAllEvents()
+		fetch := ses.GetRecentEvents
+		if allConnections {
+			fetch = ses.GetAllEvents
+		}
+
+		events, err := fetch()
 		cobra.CheckErr(err)
 
 		macs, err := ses.GetMACs()
@@ -35,4 +42,6 @@ var eventConnectionsCmd = &cobra.Command{
 
 func init() { // nolint: gochecknoinits
 	eventCmd.AddCommand(eventConnectionsCmd)
+
+	eventCmd.PersistentFlags().BoolVar(&allConnections, "all", allConnections, "show all connection events")
 }

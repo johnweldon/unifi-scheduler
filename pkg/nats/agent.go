@@ -142,7 +142,7 @@ func (a *Agent) refreshUsers() error {
 	}
 
 	for _, user := range users {
-		mac := string(user.MAC)
+		mac := user.MAC.String()
 		if err = a.store(DetailBucket(a.base), mac, user); err != nil {
 			return fmt.Errorf("persisting user %q: %w", mac, err)
 		}
@@ -162,7 +162,7 @@ func (a *Agent) refreshDevices() error {
 	}
 
 	for _, device := range devices {
-		mac := string(device.MAC)
+		mac := device.MAC.String()
 		if err = a.store(DetailBucket(a.base), mac, device); err != nil {
 			return fmt.Errorf("persisting device %q: %w", mac, err)
 		}
@@ -182,7 +182,7 @@ func (a *Agent) refreshLookups() error {
 	}
 
 	for k, v := range macs {
-		mac := string(k)
+		mac := k.String()
 		if err = a.store(ByMACBucket(a.base), mac, v); err != nil {
 			return fmt.Errorf("persisting MAC names %q: %w", mac, err)
 		}

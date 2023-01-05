@@ -152,6 +152,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 	for _, device := range devices {
 		for _, name := range []string{
 			device.Name,
+			device.MAC.String(),
 		} {
 			if len(name) == 0 {
 				continue
@@ -173,6 +174,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 		for _, name := range []string{
 			user.Name,
 			user.Hostname,
+			user.MAC.String(),
 		} {
 			if len(name) == 0 {
 				continue
@@ -223,7 +225,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 				names[name] = &stringset.OrderedStringSet{}
 			}
 
-			names[name].Add(string(device.MAC))
+			names[name].Add(device.MAC.String())
 		}
 	}
 
@@ -242,7 +244,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			user.DeviceName,
 			string(user.IP),
 			string(user.FixedIP),
-			string(user.MAC),
+			user.MAC.String(),
 		} {
 			if len(name) == 0 {
 				continue
@@ -252,7 +254,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 				names[name] = &stringset.OrderedStringSet{}
 			}
 
-			names[name].Add(string(user.MAC))
+			names[name].Add(user.MAC.String())
 		}
 	}
 
@@ -354,7 +356,7 @@ func (s *Session) getDevices() (map[string]Device, error) {
 	}
 
 	for _, device := range dresp.Data {
-		devices[string(device.MAC)] = device
+		devices[device.MAC.String()] = device
 	}
 
 	return devices, nil
@@ -381,12 +383,11 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 		return nil, fmt.Errorf("unmarshalling events: %w", err)
 	}
 
-	const maxRecent = 500
-	if !all && eresp.Meta.Count > maxRecent {
-		return eresp.Data[:maxRecent], nil
-	}
+	events := eresp.Data
 
-	return eresp.Data, nil
+	DefaultEventSort.Sort(events)
+
+	return events, nil
 }
 
 // Raw executes arbitrary endpoints.
