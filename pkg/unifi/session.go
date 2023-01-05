@@ -213,6 +213,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 		for _, name := range []string{
 			device.Name,
 			string(device.IP),
+			string(device.MAC),
 		} {
 			if len(name) == 0 {
 				continue
@@ -241,6 +242,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 			user.DeviceName,
 			string(user.IP),
 			string(user.FixedIP),
+			string(user.MAC),
 		} {
 			if len(name) == 0 {
 				continue
