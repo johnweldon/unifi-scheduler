@@ -107,6 +107,11 @@ func (a *Agent) publishEvents() error {
 		}
 	}
 
+	const maxEvents = 500
+	if len(events) > maxEvents {
+		events = events[len(events)-500:]
+	}
+
 	if err = a.store(DetailBucket(a.base), EventsKey, events); err != nil {
 		return fmt.Errorf("persisting recent events: %w", err)
 	}
