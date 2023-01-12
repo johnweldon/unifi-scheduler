@@ -21,6 +21,6 @@ type EventResponse struct {
 // Meta encapsulates basic meta from response.
 type Meta struct {
 	RC      string `json:"rc,omitempty"`
-	Count   int    `json:"count,omitempty"`
+	Count   int64  `json:"count,omitempty"`
 	Message string `json:"msg,omitempty"`
 }
