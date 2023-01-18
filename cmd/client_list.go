@@ -18,7 +18,7 @@ var clientListCmd = &cobra.Command{
 
 		fetch := ses.GetClients
 		if allClients {
-			fetch = ses.GetUsers
+			fetch = ses.GetAllClients
 		}
 
 		clients, err := fetch()

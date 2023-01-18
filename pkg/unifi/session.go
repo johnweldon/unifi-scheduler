@@ -37,6 +37,7 @@ type Session struct {
 	dbgWriter io.Writer
 }
 
+// Option describes an option parameter.
 type Option func(*Session)
 
 func WithOut(o io.Writer) Option { return func(s *Session) { s.outWriter = o } }
@@ -98,6 +99,7 @@ func (s *Session) Login() (string, error) {
 	return s.login()
 }
 
+// GetDevices looks up and returns known Devices.
 func (s *Session) GetDevices() ([]Device, error) {
 	var (
 		devices []Device
@@ -119,22 +121,27 @@ func (s *Session) GetDevices() ([]Device, error) {
 	return devices, nil
 }
 
-func (s *Session) GetClients() ([]Client, error) {
-	return s.getClients(false)
+// GetClients returns a list of connected Clients.
+func (s *Session) GetClients(filters ...ClientFilter) ([]Client, error) {
+	return s.getClients(false, filters...)
 }
 
-func (s *Session) GetUsers() ([]Client, error) {
-	return s.getClients(true)
+// GetAllClients returns all known Clients.
+func (s *Session) GetAllClients(filters ...ClientFilter) ([]Client, error) {
+	return s.getClients(true, filters...)
 }
 
+// GetAllEvents returns all events.
 func (s *Session) GetAllEvents() ([]Event, error) {
 	return s.getEvents(true)
 }
 
+// GetRecentEvents returns a list of "recent" events.
 func (s *Session) GetRecentEvents() ([]Event, error) {
 	return s.getEvents(false)
 }
 
+// GetMACs returns all known MAC addresses, and the associated names.
 func (s *Session) GetMACs() (map[MAC][]string, error) {
 	var (
 		macs = map[MAC]*stringset.OrderedStringSet{}
@@ -166,7 +173,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 		}
 	}
 
-	if users, err = s.GetUsers(); err != nil {
+	if users, err = s.GetAllClients(); err != nil {
 		return nil, fmt.Errorf("getting users: %w", err)
 	}
 
@@ -196,6 +203,7 @@ func (s *Session) GetMACs() (map[MAC][]string, error) {
 	return ret, nil
 }
 
+// GetNames returns all known names, and the associated MAC addresses.
 func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	var (
 		names = map[string]*stringset.OrderedStringSet{}
@@ -233,7 +241,7 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 		return nil, fmt.Errorf("getting users: %w", err)
 	}
 
-	if users, err = s.GetUsers(); err != nil {
+	if users, err = s.GetAllClients(); err != nil {
 		return nil, fmt.Errorf("getting users: %w", err)
 	}
 
@@ -272,6 +280,103 @@ func (s *Session) GetNames() (map[string][]MAC, error) { // nolint:funlen
 	return ret, nil
 }
 
+func (s *Session) GetMACsBy(ids ...string) ([]MAC, error) {
+	var (
+		err     error
+		allMACs []MAC
+		names   map[string][]MAC
+	)
+
+	if names, err = s.GetNames(); err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		if macs, ok := names[id]; ok {
+			allMACs = append(allMACs, macs...)
+		}
+	}
+
+	return allMACs, nil
+}
+
+// Raw executes arbitrary endpoints.
+func (s *Session) Raw(method, path string, body io.Reader) (string, error) {
+	return s.action(method, path, body)
+}
+
+// ListEvents describes the latest events.
+func (s *Session) ListEvents() (string, error) { return s.action(http.MethodGet, "/stat/event", nil) }
+
+// ListAllEvents describes all events.
+func (s *Session) ListAllEvents() (string, error) {
+	return s.action(http.MethodGet, "/rest/event", nil)
+}
+
+// ListUsers describes the known UniFi clients.
+func (s *Session) ListUsers() (string, error) { return s.action(http.MethodGet, "/rest/user", nil) }
+
+// GetUser returns user info.
+func (s *Session) GetUser(id string) (string, error) {
+	return s.action(http.MethodGet, "/rest/user/"+id, nil)
+}
+
+// GetUserByMAC returns user info.
+func (s *Session) GetUserByMAC(mac string) (string, error) {
+	return s.action(http.MethodGet, "/rest/user/?mac="+mac, nil)
+}
+
+// SetUserDetails configures a friendly name and static ip assignation
+// for a given MAC address.
+func (s *Session) SetUserDetails(mac, name, ip string) (string, error) {
+	user, err := s.getUserByMac(mac)
+	if err != nil {
+		return "", err
+	}
+
+	return s.setUserDetails(user.ID, name, ip)
+}
+
+// ListClients describes currently connected clients.
+func (s *Session) ListClients() (string, error) { return s.action(http.MethodGet, "/stat/sta", nil) }
+
+// ListDevices describes currently connected clients.
+func (s *Session) ListDevices() (string, error) { return s.action(http.MethodGet, "/stat/device", nil) }
+
+// Kick disconnects a connected client, identified by MAC address.
+func (s *Session) Kick(macs ...MAC) (string, error) { return s.macsAction("kick-sta", macs) }
+
+// Block prevents a specific client (identified by MAC) from connecting
+// to the UniFi network.
+func (s *Session) Block(macs ...MAC) (string, error) { return s.macsAction("block-sta", macs) }
+
+// Unblock re-enables a specific client.
+func (s *Session) Unblock(macs ...MAC) (string, error) { return s.macsAction("unblock-sta", macs) }
+
+// Forget removes record of a specific list of MAC addresses.
+func (s *Session) Forget(macs ...MAC) (string, error) { return s.macsAction("forget-sta", macs) }
+
+// KickFn uses Clients to find MAC addresses to Kick.
+func (s *Session) KickFn(clients []Client, keys map[string]bool) {
+	s.clientsFn(s.Kick, keys, clients...)
+}
+
+// BlockFn uses Clients to find MAC addresses to Block.
+func (s *Session) BlockFn(clients []Client, keys map[string]bool) {
+	s.clientsFn(s.Block, keys, clients...)
+}
+
+// UnblockFn uses Clients to find MAC addresses to Unblock.
+func (s *Session) UnblockFn(clients []Client, keys map[string]bool) {
+	s.clientsFn(s.Unblock, keys, clients...)
+}
+
+// ForgetFn uses Clients to find MAC addresses to Forget.
+func (s *Session) ForgetFn(clients []Client, keys map[string]bool) {
+	s.clientsFn(s.Forget, keys, clients...)
+}
+
+// getUserByMac looks up a Client by the MAC address.
 func (s *Session) getUserByMac(mac string) (*Client, error) {
 	var (
 		err  error
@@ -294,7 +399,28 @@ func (s *Session) getUserByMac(mac string) (*Client, error) {
 	return &resp.Data[0], nil
 }
 
-func (s *Session) getClients(all bool) ([]Client, error) {
+type ClientFilter func(Client) bool
+
+func Not(filter ClientFilter) ClientFilter { return func(c Client) bool { return !filter(c) } }
+
+func Blocked(c Client) bool    { return c.IsBlocked }
+func Authorized(c Client) bool { return c.IsAuthorized }
+func Guest(c Client) bool      { return c.IsGuest }
+func Wired(c Client) bool      { return c.IsWired }
+
+func passAll(client Client, filters ...ClientFilter) bool {
+	for _, filter := range filters {
+		if !filter(client) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// getClients returns a list of clients.  If all is false, only the active
+// clients will be returned, otherwise all the known clients will be returned.
+func (s *Session) getClients(all bool, filters ...ClientFilter) ([]Client, error) {
 	var (
 		devices map[string]Device
 
@@ -330,7 +456,9 @@ func (s *Session) getClients(all bool) ([]Client, error) {
 			client.UpstreamName = dev.Name
 		}
 
-		clients = append(clients, client)
+		if passAll(client, filters...) {
+			clients = append(clients, client)
+		}
 	}
 
 	sorter.Sort(clients)
@@ -338,6 +466,7 @@ func (s *Session) getClients(all bool) ([]Client, error) {
 	return clients, nil
 }
 
+// getDevices returns all known devices mapped by name.
 func (s *Session) getDevices() (map[string]Device, error) {
 	var (
 		devicesJSON string
@@ -362,6 +491,8 @@ func (s *Session) getDevices() (map[string]Device, error) {
 	return devices, nil
 }
 
+// getEvents returns a list of events. If all is true, then all known events
+// will be returned, otherwise only the most recent ones will be returned.
 func (s *Session) getEvents(all bool) ([]Event, error) {
 	var (
 		eventsJSON string
@@ -390,111 +521,7 @@ func (s *Session) getEvents(all bool) ([]Event, error) {
 	return events, nil
 }
 
-// Raw executes arbitrary endpoints.
-func (s *Session) Raw(method, path string, body io.Reader) (string, error) {
-	return s.action(method, path, body)
-}
-
-// ListEvents describes the latest events.
-func (s *Session) ListEvents() (string, error) { return s.action(http.MethodGet, "/stat/event", nil) }
-
-// ListAllEvents describes all events.
-func (s *Session) ListAllEvents() (string, error) {
-	return s.action(http.MethodGet, "/rest/event", nil)
-}
-
-// ListUsers describes the known UniFi clients.
-func (s *Session) ListUsers() (string, error) { return s.action(http.MethodGet, "/rest/user", nil) }
-
-// GetUser returns user info.
-func (s *Session) GetUser(id string) (string, error) {
-	return s.action(http.MethodGet, "/rest/user/"+id, nil)
-}
-
-// GetUserByMAC returns user info.
-func (s *Session) GetUserByMAC(mac string) (string, error) {
-	return s.action(http.MethodGet, "/rest/user/?mac="+mac, nil)
-}
-
-func (s *Session) SetUserDetails(mac, name, ip string) (string, error) {
-	user, err := s.getUserByMac(mac)
-	if err != nil {
-		return "", err
-	}
-
-	return s.setUserDetails(user.ID, name, ip)
-}
-
-// ListClients describes currently connected clients.
-func (s *Session) ListClients() (string, error) { return s.action(http.MethodGet, "/stat/sta", nil) }
-
-// ListDevices describes currently connected clients.
-func (s *Session) ListDevices() (string, error) { return s.action(http.MethodGet, "/stat/device", nil) }
-
-// Kick disconnects a connected client, identified by MAC address.
-func (s *Session) Kick(mac MAC) (string, error) { return s.macAction("kick-sta", mac) }
-
-// Block prevents a specific client (identified by MAC) from connecting
-// to the UniFi network.
-func (s *Session) Block(mac MAC) (string, error) { return s.macAction("block-sta", mac) }
-
-// Unblock re-enables a specific client.
-func (s *Session) Unblock(mac MAC) (string, error) { return s.macAction("unblock-sta", mac) }
-
-// Forget removes record of a specific list of MAC addresses.
-func (s *Session) Forget(macs []MAC) (string, error) { return s.macsAction("forget-sta", macs) }
-
-func (s *Session) BlockFn(clients []Client, keys map[string]bool) {
-	for _, client := range clients {
-		display := firstNonEmpty(client.Name, client.Hostname)
-		if k, ok := keys[display]; ok && k {
-			res, err := s.Block(client.MAC)
-			if err != nil {
-				fmt.Fprintf(s.errWriter, "%s\nerror blocking: %v\n", res, err)
-
-				return
-			}
-
-			fmt.Fprintf(s.outWriter, "%s\n", res)
-		}
-	}
-}
-
-func (s *Session) UnblockFn(clients []Client, keys map[string]bool) {
-	for _, client := range clients {
-		display := firstNonEmpty(client.Name, client.Hostname)
-		if k, ok := keys[display]; ok && k {
-			res, err := s.Unblock(client.MAC)
-			if err != nil {
-				fmt.Fprintf(s.errWriter, "%s\nerror unblocking: %v\n", res, err)
-
-				return
-			}
-
-			fmt.Fprintf(s.outWriter, "%s\n", res)
-		}
-	}
-}
-
-func (s *Session) ForgetFn(clients []Client, keys map[string]bool) {
-	var macs []MAC
-	for _, client := range clients {
-		display := firstNonEmpty(client.Name, client.Hostname)
-		if k, ok := keys[display]; ok && k {
-			macs = append(macs, client.MAC)
-		}
-	}
-
-	res, err := s.Forget(macs)
-	if err != nil {
-		fmt.Fprintf(s.errWriter, "%s\nerror forgetting: %v\n", res, err)
-
-		return
-	}
-
-	fmt.Fprintf(s.outWriter, "%s\n", res)
-}
-
+// webLogin performs the authentication for this session.
 func (s *Session) webLogin() (string, error) {
 	if s.err != nil {
 		return "", s.err
@@ -517,6 +544,8 @@ func (s *Session) webLogin() (string, error) {
 	return respBody, err
 }
 
+// buildURL generates the endpoint URL relevant to the configured
+// version of UniFi.
 func (s *Session) buildURL(path string) (*url.URL, error) {
 	if s.err != nil {
 		return nil, s.err
@@ -535,12 +564,14 @@ func (s *Session) buildURL(path string) (*url.URL, error) {
 	return url.Parse(fmt.Sprintf("%s%s/api/s/%s%s", s.Endpoint, pathPrefix, site, path))
 }
 
+// macAction applies an action to a single MAC.
 func (s *Session) macAction(action string, mac MAC) (string, error) {
 	payload := fmt.Sprintf(`{"cmd":%q,"mac":%q}`, action, mac)
 
 	return s.action(http.MethodPost, "/cmd/stamgr", bytes.NewBufferString(payload))
 }
 
+// macsAction applies a function to multiple MACs.
 func (s *Session) macsAction(action string, macs []MAC) (string, error) {
 	if len(macs) == 0 {
 		return "", nil
@@ -554,6 +585,25 @@ func (s *Session) macsAction(action string, macs []MAC) (string, error) {
 	payload := fmt.Sprintf(`{"cmd":%q,"macs":[%s]}`, action, strings.Join(allmacs, ","))
 
 	return s.action(http.MethodPost, "/cmd/stamgr", bytes.NewBufferString(payload))
+}
+
+func (s *Session) clientsFn(action func(...MAC) (string, error), keys map[string]bool, clients ...Client) {
+	var macs []MAC
+	for _, client := range clients {
+		display := firstNonEmpty(client.Name, client.Hostname)
+		if k, ok := keys[display]; ok && k {
+			macs = append(macs, client.MAC)
+		}
+	}
+
+	res, err := action(macs...)
+	if err != nil {
+		fmt.Fprintf(s.errWriter, "%s\nerror: %v\n", res, err)
+
+		return
+	}
+
+	fmt.Fprintf(s.outWriter, "%s\n", res)
 }
 
 func (s *Session) setUserDetails(id, name, ip string) (string, error) {

@@ -14,19 +14,13 @@ var blockCmd = &cobra.Command{
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
 
-		names, err := ses.GetNames()
+		macs, err := ses.GetMACsBy(args...)
 		cobra.CheckErr(err)
 
-		for _, victim := range args {
-			if macs, ok := names[victim]; ok {
-				for _, mac := range macs {
-					fmt.Fprintf(cmd.OutOrStdout(), "blocking %q (%s) ... ", victim, mac)
-					_, err := ses.Block(mac)
-					cobra.CheckErr(err)
-					fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
-				}
-			}
-		}
+		_, err = ses.Block(macs...)
+		cobra.CheckErr(err)
+
+		fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
 	},
 }
 

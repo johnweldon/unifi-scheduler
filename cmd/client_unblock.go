@@ -14,19 +14,13 @@ var unblockCmd = &cobra.Command{
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
 
-		names, err := ses.GetNames()
+		macs, err := ses.GetMACsBy(args...)
 		cobra.CheckErr(err)
 
-		for _, victim := range args {
-			if macs, ok := names[victim]; ok {
-				for _, mac := range macs {
-					fmt.Fprintf(cmd.OutOrStdout(), "unblocking %q (%s) ... ", victim, mac)
-					_, err := ses.Unblock(mac)
-					cobra.CheckErr(err)
-					fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
-				}
-			}
-		}
+		_, err = ses.Unblock(macs...)
+		cobra.CheckErr(err)
+
+		fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
 	},
 }
 

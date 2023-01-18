@@ -270,6 +270,17 @@ func (client *Client) UpstreamMAC() string {
 	return firstNonEmpty(client.AccessPointMAC, client.SwitchMAC, client.GatewayMAC)
 }
 
+// ToMACs converts a slice of Client to a slice of the corresponding MACs.
+func ToMACs(clients []Client) []MAC {
+	var macs []MAC
+
+	for _, client := range clients {
+		macs = append(macs, client.MAC)
+	}
+
+	return macs
+}
+
 // ClientOrderedBy returns a ClientSorter that sorts by the provided less functions.
 func ClientOrderedBy(less ...ClientLessFn) *ClientSorter {
 	return &ClientSorter{less: less}

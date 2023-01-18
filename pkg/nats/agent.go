@@ -137,7 +137,7 @@ func (a *Agent) refreshClients() error {
 }
 
 func (a *Agent) refreshUsers() error {
-	users, err := a.client.GetUsers()
+	users, err := a.client.GetAllClients()
 	if err != nil {
 		return fmt.Errorf("get users: %w", err)
 	}
