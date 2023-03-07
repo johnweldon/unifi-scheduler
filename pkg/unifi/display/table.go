@@ -64,8 +64,8 @@ func EventsTable(out io.Writer, displayName func(unifi.MAC) (string, bool), even
 	configs := []table.ColumnConfig{
 		{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 25},
 		{Name: "Event", WidthMax: 15},
-		{Name: "From"},
-		{Name: "To"},
+		{Name: "From", WidthMax: 15},
+		{Name: "To", WidthMax: 15},
 		{Name: "When"},
 		{Name: "Ago"},
 	}
