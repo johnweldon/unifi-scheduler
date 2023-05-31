@@ -92,7 +92,7 @@ type Device struct {
 	RequiredVersion            string                `json:"required_version,omitempty"`
 	RollUpgrade                bool                  `json:"rollupgrade,omitempty"`
 	SSHSessionTable            []SSHSession          `json:"ssh_session_table,omitempty"`
-	STPPriority                string                `json:"stp_priority,omitempty"`
+	STPPriority                Number                `json:"stp_priority,omitempty"`
 	STPVersion                 string                `json:"stp_version,omitempty"`
 	Satisfaction               int64                 `json:"satisfaction,omitempty"`
 	Serial                     string                `json:"serial,omitempty"`
