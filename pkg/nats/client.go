@@ -8,6 +8,8 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+var DefaultConnectTimeout = 5 * time.Second
+
 type ClientOpt func(*Client)
 
 func OptNATSUrl(u string) ClientOpt { return func(c *Client) { c.connURL = u } }
@@ -45,7 +47,7 @@ func (n *Client) ensureConnection() error {
 		n.conn = nil
 	}
 
-	if n.conn, err = nats.Connect(n.connURL); err != nil {
+	if n.conn, err = nats.Connect(n.connURL, nats.Timeout(DefaultConnectTimeout)); err != nil {
 		return fmt.Errorf("ensureConnection: connecting to NATS: %w", err)
 	}
 
