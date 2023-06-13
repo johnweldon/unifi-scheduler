@@ -82,7 +82,7 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		Data:    data,
 	}
 
-	if _, err = js.PublishMsg(pmsg); err != nil {
+	if _, err = js.PublishMsgAsync(pmsg); err != nil {
 		return fmt.Errorf("publishStream: cannot publish data: %w", err)
 	}
 
@@ -114,7 +114,7 @@ func (n *Publisher) store(bucket, key string, val any) error {
 	}
 
 	if _, err = kv.Put(key, data); err != nil {
-		return fmt.Errorf("store: cannot get put in bucket %q: %w", bucket, err)
+		return fmt.Errorf("store: cannot put in bucket %q: %w", bucket, err)
 	}
 
 	return nil
