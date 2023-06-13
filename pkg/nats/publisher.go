@@ -3,7 +3,6 @@ package nats
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/nats-io/nats.go"
 )
@@ -58,12 +57,12 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		return fmt.Errorf("publishStream: not connected: %w", err)
 	}
 
-	if js, err = n.conn.JetStream(
-		nats.PublishAsyncErrHandler(func(j nats.JetStream, m *nats.Msg, e error) {
-			log.Printf("ERROR!!! %v: %v / %v", e, j, m)
-		}),
-		nats.PublishAsyncMaxPending(10),
-	); err != nil {
+	opts := []nats.JSOpt{
+		// nats.PublishAsyncErrHandler(func(j nats.JetStream, m *nats.Msg, e error) { log.Printf("ERROR!!! %v: %v / %v", e, j, m) }),
+		// nats.PublishAsyncMaxPending(10),
+	}
+
+	if js, err = n.conn.JetStream(opts...); err != nil {
 		return fmt.Errorf("publishStream: cannot get jetstream: %w", err)
 	}
 
@@ -82,7 +81,7 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		Data:    data,
 	}
 
-	if _, err = js.PublishMsgAsync(pmsg); err != nil {
+	if _, err = js.PublishMsg(pmsg); err != nil {
 		return fmt.Errorf("publishStream: cannot publish data: %w", err)
 	}
 
