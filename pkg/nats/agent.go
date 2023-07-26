@@ -65,31 +65,31 @@ func (a *Agent) serve(ctx context.Context) {
 		case <-eventInterval:
 			eventInterval = time.After(10 * time.Second)
 			if err = a.publishEvents(); err != nil {
-				log.Fatal(err)
+				log.Printf("error: publishing events %v", err)
 			}
 
 		case <-clientInterval:
 			clientInterval = time.After(1 * time.Minute)
 			if err = a.refreshClients(); err != nil {
-				log.Fatal(err)
+				log.Printf("error: refreshing clients %v", err)
 			}
 
 		case <-userInterval:
 			userInterval = time.After(5 * time.Minute)
 			if err = a.refreshUsers(); err != nil {
-				log.Fatal(err)
+				log.Printf("error: refreshing users %v", err)
 			}
 
 		case <-deviceInterval:
 			deviceInterval = time.After(10 * time.Minute)
 			if err = a.refreshDevices(); err != nil {
-				log.Fatal(err)
+				log.Printf("error: refreshing devices %v", err)
 			}
 
 		case <-lookupInterval:
 			lookupInterval = time.After(15 * time.Minute)
 			if err = a.refreshLookups(); err != nil {
-				log.Fatal(err)
+				log.Printf("error: refreshing lookups %v", err)
 			}
 		}
 	}

@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	DefaultConnectTimeout = 5 * time.Second
-	DefaultWriteTimeout   = 15 * time.Second
+	DefaultConnectTimeout = 15 * time.Second
+	DefaultWriteTimeout   = 30 * time.Second
 )
 
 type ClientOpt func(*Client)
