@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +16,7 @@ var natsAgentCmd = &cobra.Command{
 	Aliases: []string{"agt", "a"},
 	Short:   "nats agent",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\n", Version)
+		cmd.Printf("Version: %s\n", Version)
 
 		ctx, _ := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 
@@ -30,20 +29,22 @@ var natsAgentCmd = &cobra.Command{
 		cobra.CheckErr(a.Start(ctx))
 
 		markInterval := time.After(1 * time.Second)
-		nlInterval := time.After(2 * time.Second)
+		hourInterval := time.After(1 * time.Hour)
 
 		for {
 			select {
 			case <-ctx.Done():
-				fmt.Fprintf(cmd.OutOrStdout(), "quitting...\n")
+				cmd.Printf("quitting...\n")
 				return
 			case <-markInterval:
 				markInterval = time.After(1 * time.Minute)
-				fmt.Fprintf(cmd.OutOrStdout(), ".")
-			case <-nlInterval:
-				nlInterval = time.After(1 * time.Hour)
-				fmt.Fprintf(cmd.OutOrStdout(), "H\n")
+				cmd.Printf(".")
+			case <-hourInterval:
+				hourInterval = time.After(1 * time.Hour)
+				cmd.Printf("H\n")
 			}
+
+			os.Stdout.Sync()
 		}
 	},
 }

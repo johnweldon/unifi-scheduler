@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +18,7 @@ var forgetCmd = &cobra.Command{
 		_, err = ses.Forget(macs...)
 		cobra.CheckErr(err)
 
-		fmt.Fprintf(cmd.OutOrStdout(), "ok\n")
+		cmd.Printf("ok\n")
 	},
 }
 

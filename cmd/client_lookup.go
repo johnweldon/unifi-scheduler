@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
@@ -25,12 +23,12 @@ var lookupCmd = &cobra.Command{
 		for _, victim := range args {
 			if macs, ok := names[victim]; ok {
 				for _, mac := range macs {
-					fmt.Fprintf(cmd.OutOrStdout(), "%s %q\n", mac, victim)
+					cmd.Printf("%s %q\n", mac, victim)
 				}
 			}
 
 			if name, ok := macs[unifi.MAC(victim)]; ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %q\n", name, victim)
+				cmd.Printf("%s %q\n", name, victim)
 			}
 		}
 	},

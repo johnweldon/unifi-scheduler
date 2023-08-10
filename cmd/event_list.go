@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +23,7 @@ var eventListCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		for _, event := range events {
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", event.String())
+			cmd.Printf("%s\n", event.String())
 		}
 	},
 }

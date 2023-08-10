@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +16,7 @@ var listCmd = &cobra.Command{
 		cobra.CheckErr(err)
 
 		for _, device := range devices {
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", device.String())
+			cmd.Printf("%s\n", device.String())
 		}
 	},
 }

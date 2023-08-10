@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -31,7 +30,7 @@ var rawCmd = &cobra.Command{
 		out, err := ses.Raw(method, path, body)
 		cobra.CheckErr(err)
 
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n", out)
+		cmd.Printf("%s\n", out)
 	},
 }
 

@@ -32,7 +32,7 @@ var versionCmd = &cobra.Command{
 	Aliases: []string{"ver", "v"},
 	Short:   "application version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\n", Version)
+		cmd.Printf("Version: %s\n", Version)
 	},
 }
 
