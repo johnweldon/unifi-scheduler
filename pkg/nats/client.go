@@ -3,6 +3,7 @@ package nats
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -45,6 +46,8 @@ func (n *Client) ensureConnection() error {
 		if n.conn.IsConnected() {
 			return nil
 		}
+
+		log.Print("ensureConnection: was not connected, retrying")
 
 		n.conn.Close()
 		n.conn = nil

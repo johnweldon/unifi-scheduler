@@ -65,31 +65,31 @@ func (a *Agent) serve(ctx context.Context) {
 		case <-eventInterval:
 			eventInterval = time.After(37 * time.Second)
 			if err = a.publishEvents(); err != nil {
-				log.Fatalf("error: publishing events %v", err)
+				log.Printf("error: publishing events %v", err)
 			}
 
 		case <-clientInterval:
 			clientInterval = time.After(53 * time.Second)
 			if err = a.refreshClients(); err != nil {
-				log.Fatalf("error: refreshing clients %v", err)
+				log.Printf("error: refreshing clients %v", err)
 			}
 
 		case <-userInterval:
 			userInterval = time.After(337 * time.Second)
 			if err = a.refreshUsers(); err != nil {
-				log.Fatalf("error: refreshing users %v", err)
+				log.Printf("error: refreshing users %v", err)
 			}
 
 		case <-deviceInterval:
 			deviceInterval = time.After(607 * time.Second)
 			if err = a.refreshDevices(); err != nil {
-				log.Fatalf("error: refreshing devices %v", err)
+				log.Printf("error: refreshing devices %v", err)
 			}
 
 		case <-lookupInterval:
 			lookupInterval = time.After(997 * time.Second)
 			if err = a.refreshLookups(); err != nil {
-				log.Fatalf("error: refreshing lookups %v", err)
+				log.Printf("error: refreshing lookups %v", err)
 			}
 		}
 	}
@@ -248,7 +248,7 @@ func DetailBucket(base string) string        { return base + "-details" }
 func ByMACBucket(base string) string         { return base + "-bymac" }
 func ByNameBucket(base string) string        { return base + "-byname" }
 func EventStream(base string) string         { return base + "-events" }
-func subSubject(base, subject string) string { return strings.Join([]string{base, subject}, ".") }
+func subSubject(base, subject string) string { return base + "." + subject }
 
 func NormalizeKey(s string) string {
 	fn := func(r rune) rune {
