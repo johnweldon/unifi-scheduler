@@ -1,10 +1,12 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 func NewPublisher(opts ...ClientOpt) *Publisher {
@@ -50,19 +52,14 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 	var (
 		err  error
 		data []byte
-		js   nats.JetStreamContext
+		js   jetstream.JetStream
 	)
 
 	if err = n.ensureConnection(); err != nil {
 		return fmt.Errorf("publishStream: not connected: %w", err)
 	}
 
-	opts := []nats.JSOpt{
-		// nats.PublishAsyncErrHandler(func(j nats.JetStream, m *nats.Msg, e error) { log.Printf("ERROR!!! %v: %v / %v", e, j, m) }),
-		// nats.PublishAsyncMaxPending(10),
-	}
-
-	if js, err = n.conn.JetStream(opts...); err != nil {
+	if js, err = jetstream.New(n.conn); err != nil {
 		return fmt.Errorf("publishStream: cannot get jetstream: %w", err)
 	}
 
@@ -81,7 +78,7 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		Data:    data,
 	}
 
-	if _, err = js.PublishMsg(pmsg); err != nil {
+	if _, err = js.PublishMsg(context.Background(), pmsg); err != nil {
 		return fmt.Errorf("publishStream: cannot publish data: %w", err)
 	}
 
@@ -92,19 +89,19 @@ func (n *Publisher) store(bucket, key string, val any) error {
 	var (
 		err  error
 		data []byte
-		js   nats.JetStreamContext
-		kv   nats.KeyValue
+		js   jetstream.JetStream
+		kv   jetstream.KeyValue
 	)
 
 	if err = n.ensureConnection(); err != nil {
 		return fmt.Errorf("store: not connected: %w", err)
 	}
 
-	if js, err = n.conn.JetStream(); err != nil {
+	if js, err = jetstream.New(n.conn); err != nil {
 		return fmt.Errorf("store: cannot get jetstream: %w", err)
 	}
 
-	if kv, err = js.KeyValue(bucket); err != nil {
+	if kv, err = js.KeyValue(context.Background(), bucket); err != nil {
 		return fmt.Errorf("store: cannot get bucket %q: %w", bucket, err)
 	}
 
@@ -112,7 +109,7 @@ func (n *Publisher) store(bucket, key string, val any) error {
 		return fmt.Errorf("store: cannot marshal data: %w", err)
 	}
 
-	if _, err = kv.Put(key, data); err != nil {
+	if _, err = kv.Put(context.Background(), key, data); err != nil {
 		return fmt.Errorf("store: cannot put in bucket %q: %w", bucket, err)
 	}
 

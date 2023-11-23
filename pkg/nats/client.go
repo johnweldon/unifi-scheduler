@@ -1,12 +1,14 @@
 package nats
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 var (
@@ -76,29 +78,34 @@ func (n *Client) ensureConnection() error {
 func (n *Client) ensureStreams() error {
 	var (
 		err error
-		js  nats.JetStreamContext
+		js  jetstream.JetStream
 	)
 
-	if js, err = n.conn.JetStream(); err != nil {
+	if js, err = jetstream.New(n.conn); err != nil {
 		return fmt.Errorf("ensureStreams: cannot get jetstream: %w", err)
 	}
 
 	for _, stream := range n.streams {
-		if _, err = js.StreamInfo(stream); err != nil {
-			if !errors.Is(err, nats.ErrStreamNotFound) {
+		cfg := jetstream.StreamConfig{
+			Name:       stream,
+			Subjects:   []string{fmt.Sprintf("%s.*", stream)},
+			Duplicates: 1 * time.Hour,
+			Discard:    jetstream.DiscardOld,
+			Retention:  jetstream.LimitsPolicy,
+			MaxMsgs:    1000,
+		}
+
+		if _, err = js.Stream(context.Background(), stream); err != nil {
+			if !errors.Is(err, jetstream.ErrStreamNotFound) {
 				return fmt.Errorf("ensureStreams: getting stream info %q: %w", stream, err)
 			}
 
-			if _, err = js.AddStream(&nats.StreamConfig{Name: stream}); err != nil {
+			if _, err = js.CreateStream(context.Background(), cfg); err != nil {
 				return fmt.Errorf("ensureStreams: creating stream %q: %w", stream, err)
 			}
 		}
 
-		if _, err = js.UpdateStream(&nats.StreamConfig{
-			Name:       stream,
-			Subjects:   []string{fmt.Sprintf("%s.*", stream)},
-			Duplicates: 1 * time.Hour,
-		}); err != nil {
+		if _, err = js.UpdateStream(context.Background(), cfg); err != nil {
 			return fmt.Errorf("ensureStreams: updating stream %q: %w", stream, err)
 		}
 	}
@@ -109,20 +116,25 @@ func (n *Client) ensureStreams() error {
 func (n *Client) ensureBuckets() error {
 	var (
 		err error
-		js  nats.JetStreamContext
+		js  jetstream.JetStream
 	)
 
-	if js, err = n.conn.JetStream(); err != nil {
+	if js, err = jetstream.New(n.conn); err != nil {
 		return fmt.Errorf("ensureBuckets: cannot get jetstream: %w", err)
 	}
 
 	for _, bucket := range n.buckets {
-		if _, err = js.KeyValue(bucket); err != nil {
-			if !errors.Is(err, nats.ErrBucketNotFound) {
+		if _, err = js.KeyValue(context.Background(), bucket); err != nil {
+			if !errors.Is(err, jetstream.ErrBucketNotFound) {
 				return fmt.Errorf("ensureBuckets: getting bucket %q: %w", bucket, err)
 			}
 
-			if _, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: bucket, TTL: 90 * 24 * time.Hour}); err != nil {
+			cfg := jetstream.KeyValueConfig{
+				Bucket: bucket,
+				TTL:    90 * 24 * time.Hour,
+			}
+
+			if _, err = js.CreateKeyValue(context.Background(), cfg); err != nil {
 				return fmt.Errorf("ensureBuckets: creating bucket %q: %w", bucket, err)
 			}
 		}
