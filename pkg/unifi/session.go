@@ -706,7 +706,16 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 	}
 
 	if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
-		s.setErrorString(http.StatusText(resp.StatusCode))
+		if resp.StatusCode == http.StatusUnauthorized {
+			fmt.Fprintf(s.errWriter, "\nlogged out; re-authenticating")
+			s.login = s.webLogin
+			if r, err := s.login(); err != nil {
+				s.setError(err)
+				return r, fmt.Errorf("login attempt failed: %w", err)
+			}
+		} else {
+			s.setErrorString(http.StatusText(resp.StatusCode))
+		}
 	}
 
 	return string(respBody), s.err
