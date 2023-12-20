@@ -1,45 +1,15 @@
-#
-# Builder
-#
+FROM golang AS certs
 
-FROM    golang:1.21 AS builder
-
-RUN     apt-get update && apt-get -uy upgrade
-RUN     apt-get -y install ca-certificates && update-ca-certificates
-
-WORKDIR /src
-COPY    . .
-
-ARG \
-  GOPROXY \
-  BUILD_VERSION
-
-ENV \
-  CGO_ENABLED=0 \
-  GOPROXY=${GOPROXY} \
-  BUILD_VERSION=${BUILD_VERSION}
-
-RUN \
-  go build \
-  -tags=netgo \
-  -ldflags '-s -w -extldflags "-static"' \
-  -ldflags "-X main.version=${BUILD_VERSION}" \
-  -o /unifi-scheduler .
-
-#
-# Image
-#
-
-FROM    scratch
+FROM scratch
 
 LABEL \
   maintainer="John Weldon <john@tempusbreve.com>" \
   company="Tempus Breve Software" \
   description="Unifi Scheduling Tool"
 
-COPY    --from=builder /etc/ssl/certs /etc/ssl/certs
-COPY    --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
-COPY    --from=builder /unifi-scheduler /unifi-scheduler
+COPY --from=certs /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY unifi-scheduler unifi-scheduler
 
 ENV \
   TZ="America/Phoenix" \
@@ -47,6 +17,5 @@ ENV \
   UNIFI_USERNAME="" \
   UNIFI_PASSWORD="" \
   UNIFI_ENDPOINT=""
-
 
 ENTRYPOINT ["/unifi-scheduler"]

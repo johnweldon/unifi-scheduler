@@ -3,6 +3,7 @@
 .envrc
 block
 devices
+dist/
 list
 unblock
 unifi-scheduler
