@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
+	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	lnats "github.com/johnweldon/unifi-scheduler/pkg/nats"
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
@@ -119,9 +122,26 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		Password: password,
 	}
 
+	nc, err := nats.Connect(natsURL)
+	if err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "error connecting to NATS: %v\n", err)
+
+		return nil, err
+	}
+
+	outio := io.MultiWriter(&lnats.Logger{
+		Connection:     nc,
+		PublishSubject: "log.info",
+	}, cmd.OutOrStdout())
+
+	errio := io.MultiWriter(&lnats.Logger{
+		Connection:     nc,
+		PublishSubject: "log.error",
+	}, cmd.ErrOrStderr())
+
 	options := []unifi.Option{
-		unifi.WithOut(cmd.OutOrStderr()),
-		unifi.WithErr(cmd.ErrOrStderr()),
+		unifi.WithOut(outio),
+		unifi.WithErr(errio),
 	}
 
 	if debug {
