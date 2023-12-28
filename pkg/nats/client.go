@@ -93,6 +93,7 @@ func (n *Client) ensureStreams() error {
 			Discard:    jetstream.DiscardOld,
 			Retention:  jetstream.LimitsPolicy,
 			MaxMsgs:    1000,
+			Replicas:   3,
 		}
 
 		if _, err = js.Stream(context.Background(), stream); err != nil {
@@ -130,8 +131,9 @@ func (n *Client) ensureBuckets() error {
 			}
 
 			cfg := jetstream.KeyValueConfig{
-				Bucket: bucket,
-				TTL:    90 * 24 * time.Hour,
+				Bucket:   bucket,
+				TTL:      90 * 24 * time.Hour,
+				Replicas: 3,
 			}
 
 			if _, err = js.CreateKeyValue(context.Background(), cfg); err != nil {
