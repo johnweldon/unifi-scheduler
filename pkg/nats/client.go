@@ -20,6 +20,8 @@ type ClientOpt func(*Client)
 
 func OptNATSUrl(u string) ClientOpt { return func(c *Client) { c.connURL = u } }
 
+func OptCreds(credsFilePath string) ClientOpt { return func(c *Client) { c.credsFile = credsFilePath } }
+
 func OptStreams(names ...string) ClientOpt {
 	return func(c *Client) { c.streams = append(c.streams, names...) }
 }
@@ -29,10 +31,11 @@ func OptBuckets(names ...string) ClientOpt {
 }
 
 type Client struct {
-	connURL string
-	conn    *nats.Conn
-	streams []string
-	buckets []string
+	connURL   string
+	credsFile string
+	conn      *nats.Conn
+	streams   []string
+	buckets   []string
 }
 
 func (n *Client) Init(opts ...ClientOpt) {
@@ -58,6 +61,10 @@ func (n *Client) ensureConnection() error {
 	opts := []nats.Option{
 		nats.Timeout(DefaultConnectTimeout),
 		nats.FlusherTimeout(DefaultWriteTimeout),
+	}
+
+	if len(n.credsFile) != 0 {
+		opts = append(opts, nats.UserCredentials(n.credsFile))
 	}
 
 	if n.conn, err = nats.Connect(n.connURL, opts...); err != nil {

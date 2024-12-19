@@ -13,7 +13,7 @@ var natsConnectionsCmd = &cobra.Command{
 	Aliases: []string{"conn"},
 	Short:   "show connection events",
 	Run: func(cmd *cobra.Command, args []string) {
-		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL)}
+		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL), nats.OptCreds(natsCreds)}
 		s := nats.NewSubscriber(opts...)
 
 		detailBucket := nats.DetailBucket(baseSubject)

@@ -13,7 +13,7 @@ var natsClientsCmd = &cobra.Command{
 	Aliases: []string{"client", "cl", "c"},
 	Short:   "show active clients",
 	Run: func(cmd *cobra.Command, args []string) {
-		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL)}
+		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL), nats.OptCreds(natsCreds)}
 		s := nats.NewSubscriber(opts...)
 
 		var into []unifi.Client

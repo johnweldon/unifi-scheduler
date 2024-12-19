@@ -23,7 +23,7 @@ var natsAgentCmd = &cobra.Command{
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
 
-		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL)}
+		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL), nats.OptCreds(natsCreds)}
 
 		a := nats.NewAgent(ses, baseSubject, opts...)
 		cobra.CheckErr(a.Start(ctx))
