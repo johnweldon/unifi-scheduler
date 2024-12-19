@@ -1,6 +1,7 @@
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 
-version: 1
+version: 2
 
 before:
   hooks:
@@ -14,33 +15,37 @@ builds:
       - CGO_ENABLED=0
     targets:
       - go_first_class
-      - linux_amd64
-      - linux_arm64
-      - darwin_amd64
-      - darwin_arm64
 
 dockers:
   - image_templates:
-      - "{{ envOrDefault `DOCKER_PUBLISH_HOST` `example.com` }}/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - &amd64_image "{{ .Env.IMAGE_ROOT }}:{{ .Version }}-amd64"
+    goos: linux
     goarch: amd64
     dockerfile: Dockerfile
-    use: docker
+    use: buildx
     build_flag_templates:
       - --platform=linux/amd64
+      - --provenance=false
   - image_templates:
-      - "{{ envOrDefault `DOCKER_PUBLISH_HOST` `example.com` }}/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - &arm64_image "{{ .Env.IMAGE_ROOT }}:{{ .Version }}-arm64"
+    goos: linux
     goarch: arm64
+    goarm: 8
     dockerfile: Dockerfile
-    use: docker
+    use: buildx
     build_flag_templates:
       - --platform=linux/arm64
+      - --provenance=false
 
 docker_manifests:
-  - name_template: "{{ envOrDefault `DOCKER_PUBLISH_HOST` `example.com` }}/{{ .ProjectName }}:{{ .Version }}"
-    use: docker
+  - name_template: "{{ .Env.IMAGE_ROOT }}:{{ .Version }}"
     image_templates:
-      - "{{ envOrDefault `DOCKER_PUBLISH_HOST` `example.com` }}/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "{{ envOrDefault `DOCKER_PUBLISH_HOST` `example.com` }}/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - *amd64_image
+      - *arm64_image
+  - name_template: "{{ .Env.IMAGE_ROOT }}:latest"
+    image_templates:
+      - *amd64_image
+      - *arm64_image
 
 archives:
   - format: tar.gz
@@ -63,3 +68,6 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+release:
+  disable: true
