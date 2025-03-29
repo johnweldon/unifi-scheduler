@@ -44,7 +44,7 @@ var natsAgentCmd = &cobra.Command{
 				cmd.Printf("H\n")
 			}
 
-			os.Stdout.Sync()
+			_ = os.Stdout.Sync()
 		}
 	},
 }

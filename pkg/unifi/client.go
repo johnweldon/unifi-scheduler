@@ -161,7 +161,7 @@ func (client *Client) DisplayName() string {
 }
 
 func (client *Client) DisplayIP() string {
-	return firstNonEmpty(string(client.IP), string(client.FixedIP))
+	return firstNonEmpty(string(client.FixedIP), string(client.IP), string(client.MAC))
 }
 
 func (client *Client) DisplayLastAssociated() string {
