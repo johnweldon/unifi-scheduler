@@ -67,10 +67,10 @@ func ClientsTable(out io.Writer, clients []unifi.Client) Renderer {
 
 func EventsTable(out io.Writer, displayName func(unifi.MAC) (string, bool), events []unifi.Event) Renderer {
 	configs := []table.ColumnConfig{
-		{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 25},
-		{Name: "Event", WidthMax: 15},
-		{Name: "From", WidthMax: 15},
-		{Name: "To", WidthMax: 15},
+		{Name: "Name", Align: text.AlignRight, AlignHeader: text.AlignRight, AlignFooter: text.AlignRight},
+		{Name: "Event"},
+		{Name: "From"},
+		{Name: "To"},
 		{Name: "When"},
 		{Name: "Ago"},
 	}
