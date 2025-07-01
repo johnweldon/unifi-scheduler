@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/johnweldon/unifi-scheduler/pkg/nats"
@@ -20,6 +23,7 @@ var natsClientsCmd = &cobra.Command{
 		cobra.CheckErr(s.Get(nats.DetailBucket(baseSubject), nats.ActiveKey, &into))
 
 		display.ClientsTable(cmd.OutOrStdout(), into).Render()
+		fmt.Fprintf(cmd.OutOrStdout(), "%70s\n", time.Now().Format(time.RFC1123))
 	},
 }
 

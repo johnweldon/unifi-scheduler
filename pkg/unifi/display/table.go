@@ -56,7 +56,12 @@ func ClientsTable(out io.Writer, clients []unifi.Client) Renderer {
 			client.DisplaySwitchName(),
 		})
 	}
-	t.AppendFooter(table.Row{fmt.Sprintf("Total %d", t.Length())})
+
+	t.AppendFooter(table.Row{
+		"", "", "", "", "", "", "", "", "", "",
+		fmt.Sprintf("Total %d", t.Length()),
+	})
+
 	return t
 }
 
