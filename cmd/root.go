@@ -146,8 +146,6 @@ const (
 func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 	ses := &unifi.Session{
 		Endpoint: endpoint,
-		Username: username,
-		Password: password,
 	}
 
 	nc, err := nats.Connect(natsURL)
@@ -171,10 +169,12 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		unifi.WithOut(outio),
 		unifi.WithErr(errio),
 		unifi.WithHTTPTimeout(httpTimeout),
+		unifi.WithSecureAuth(username, password),
 	}
 
 	if debug {
-		options = append(options, unifi.WithDbg(cmd.OutOrStderr()))
+		// Use secure logging to prevent credential leakage in debug output
+		options = append(options, unifi.SecureLogOption(cmd.OutOrStderr()))
 	}
 
 	if err := ses.Initialize(options...); err != nil {

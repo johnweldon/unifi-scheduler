@@ -22,7 +22,10 @@ import (
 type Session struct {
 	Endpoint string
 	Username string
-	Password string
+	Password string // Deprecated: Use Credentials instead
+
+	// Secure credential storage
+	Credentials *Credentials
 
 	csrf   string
 	client *http.Client
@@ -47,6 +50,23 @@ func WithErr(e io.Writer) Option             { return func(s *Session) { s.errWr
 func WithDbg(d io.Writer) Option             { return func(s *Session) { s.dbgWriter = d } }
 func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpTimeout = t } }
 
+// WithCredentials sets secure credentials for the session
+func WithCredentials(creds *Credentials) Option {
+	return func(s *Session) { s.Credentials = creds }
+}
+
+// WithSecureAuth creates secure credentials from username/password
+func WithSecureAuth(username, password string) Option {
+	return func(s *Session) {
+		creds, err := NewCredentials(username, password)
+		if err != nil {
+			s.setError(fmt.Errorf("failed to create secure credentials: %w", err))
+			return
+		}
+		s.Credentials = creds
+	}
+}
+
 // Initialize prepares the session for use.
 func (s *Session) Initialize(options ...Option) error {
 	if s == nil {
@@ -67,12 +87,24 @@ func (s *Session) Initialize(options ...Option) error {
 		s.setErrorString("missing endpoint")
 	}
 
-	if len(s.Username) == 0 {
-		s.setErrorString("missing username")
-	}
-
-	if len(s.Password) == 0 {
-		s.setErrorString("missing password")
+	// Handle both legacy and secure credential formats
+	if s.Credentials != nil {
+		// Validate secure credentials
+		if err := s.Credentials.Validate(); err != nil {
+			s.setError(fmt.Errorf("invalid credentials: %w", err))
+		}
+	} else if len(s.Username) > 0 && len(s.Password) > 0 {
+		// Migrate from legacy format to secure credentials
+		creds, err := NewCredentials(s.Username, s.Password)
+		if err != nil {
+			s.setError(fmt.Errorf("failed to create secure credentials: %w", err))
+		} else {
+			s.Credentials = creds
+			// Clear legacy password from memory
+			s.Password = ""
+		}
+	} else {
+		s.setErrorString("missing credentials")
 	}
 
 	jar, err := cookiejar.New(nil)
@@ -531,16 +563,28 @@ func (s *Session) webLogin() (string, error) {
 		return "", s.err
 	}
 
+	if s.Credentials == nil {
+		return "", fmt.Errorf("no credentials available for login")
+	}
+
 	u, err := url.Parse(fmt.Sprintf("%s/api/auth/login", s.Endpoint))
 	if err != nil {
 		s.setError(err)
-
 		return "", s.err
 	}
 
-	payload := fmt.Sprintf(`{"username":%q,"password":%q,"strict":"true","remember":"true"}`, s.Username, s.Password)
+	// Build secure payload
+	password := s.Credentials.Password.String()
+	payload := fmt.Sprintf(`{"username":%q,"password":%q,"strict":"true","remember":"true"}`, s.Credentials.Username, password)
+
+	// Clear password from memory immediately after use
+	clearString(password)
 
 	respBody, err := s.post(u, bytes.NewBufferString(payload))
+
+	// Clear payload from memory
+	clearString(payload)
+
 	if err == nil {
 		s.login = func() (string, error) { return respBody, nil }
 	}
