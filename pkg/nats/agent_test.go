@@ -250,4 +250,3 @@ func TestAgentConstants(t *testing.T) {
 		t.Errorf("EventsKey = %q, want %q", EventsKey, "events")
 	}
 }
-

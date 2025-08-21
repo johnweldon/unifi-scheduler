@@ -187,4 +187,3 @@ func (c *Credentials) Clear() {
 		c.Password = nil
 	}
 }
-

@@ -194,4 +194,3 @@ func TestScrubString(t *testing.T) {
 		t.Errorf("ScrubString(%q) = %q, want %q", input, result, expected)
 	}
 }
-

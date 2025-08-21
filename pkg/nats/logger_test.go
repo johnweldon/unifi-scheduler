@@ -46,4 +46,3 @@ func TestNewStdLoggerReturnsLogger(t *testing.T) {
 	// We can't test the actual logging without a real NATS connection,
 	// but we can verify the logger was created successfully
 }
-

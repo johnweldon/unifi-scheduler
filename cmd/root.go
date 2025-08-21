@@ -34,13 +34,32 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "unifi-scheduler",
 	Aliases: []string{"ucli"},
-	Short:   "utility for interacting with unifi",
+	Short:   "A powerful CLI tool for managing UniFi network controllers",
+	Long: `UniFi Scheduler provides comprehensive management of UniFi network controllers,
+including client management, device monitoring, event tracking, and distributed
+operations via NATS messaging.
+
+For complete documentation and examples, visit:
+https://github.com/johnweldon/unifi-scheduler`,
+	Example: `  # List all connected clients
+  unifi-scheduler --endpoint https://controller --username admin --password pass client list
+
+  # Block a client by name
+  unifi-scheduler --endpoint https://controller --username admin --password pass client block "Problem Device"
+
+  # Monitor network events
+  unifi-scheduler --endpoint https://controller --username admin --password pass event list
+
+  # Use configuration file
+  unifi-scheduler --config ~/.unifi-scheduler.yaml client list`,
 }
 
 var versionCmd = &cobra.Command{
 	Use:     "version",
 	Aliases: []string{"ver", "v"},
-	Short:   "application version",
+	Short:   "Display application version information",
+	Long:    "Display the current version of unifi-scheduler.",
+	Example: "  unifi-scheduler version",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Printf("Version: %s\n", Version)
 	},

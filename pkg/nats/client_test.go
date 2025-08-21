@@ -180,4 +180,3 @@ func TestDefaultConstants(t *testing.T) {
 		t.Errorf("DefaultKVReplicas = %d, want 3", DefaultKVReplicas)
 	}
 }
-

@@ -225,4 +225,3 @@ func TestClientOrderedBySorting(t *testing.T) {
 		}
 	}
 }
-

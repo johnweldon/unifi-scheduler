@@ -176,4 +176,3 @@ func IsLikelySensitive(data string) bool {
 
 	return false
 }
-

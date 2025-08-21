@@ -123,4 +123,3 @@ func TestFlagConstants(t *testing.T) {
 		}
 	}
 }
-

@@ -297,4 +297,3 @@ func TestDurationString(t *testing.T) {
 		t.Errorf("Duration.String() returned empty string")
 	}
 }
-

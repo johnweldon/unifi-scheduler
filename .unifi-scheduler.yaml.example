@@ -1,0 +1,106 @@
+# UniFi Scheduler Configuration Example
+# Copy this file to ~/.unifi-scheduler.yaml or specify with --config flag
+
+# ============================================================================
+# REQUIRED SETTINGS - UniFi Controller Connection
+# ============================================================================
+
+# UniFi Controller endpoint URL (required)
+# Use https:// for secure connections, http:// for local/insecure
+endpoint: "https://unifi.example.com"
+
+# Controller admin credentials (required)
+username: "admin"
+password: "your-secure-password-here"
+
+# ============================================================================
+# NETWORK SETTINGS
+# ============================================================================
+
+# HTTP request timeout for UniFi API calls
+# Format: Go duration string (e.g., "30s", "2m", "1h")
+http-timeout: "2m"
+
+# Skip SSL certificate verification (for self-signed certificates)
+# Default: false (certificates are verified)
+# insecure: true
+
+# ============================================================================
+# NATS MESSAGING SETTINGS (Optional)
+# Enable these for distributed operations and centralized logging
+# ============================================================================
+
+# NATS server URL for distributed operations
+# Comment out to disable NATS integration
+nats_url: "nats://localhost:4222"
+
+# NATS connection timeout
+nats-conn-timeout: "15s"
+
+# NATS operation timeout
+nats-op-timeout: "30s"
+
+# JetStream settings for persistent messaging
+stream-replicas: 3
+kv-replicas: 3
+
+# ============================================================================
+# LOGGING AND DEBUG SETTINGS
+# ============================================================================
+
+# Enable debug output
+# Shows HTTP requests/responses, authentication flow, and detailed operations
+debug: false
+
+# ============================================================================
+# ADVANCED SETTINGS
+# ============================================================================
+
+# Site ID for multi-site UniFi controllers
+# Usually 'default' for single-site setups
+# site: "default"
+
+# Custom CA certificate file for HTTPS verification
+# ca-cert: "/path/to/custom-ca.pem"
+
+# ============================================================================
+# EXAMPLE CONFIGURATIONS
+# ============================================================================
+
+# Example 1: Basic home setup
+# endpoint: "https://192.168.1.1"
+# username: "admin"
+# password: "homepassword"
+# debug: false
+
+# Example 2: Corporate setup with NATS
+# endpoint: "https://unifi-corporate.company.com"
+# username: "network-admin"
+# password: "corporate-secure-password"
+# nats_url: "nats://monitoring.company.com:4222"
+# http-timeout: "5m"
+# debug: true
+
+# Example 3: Development/testing setup
+# endpoint: "http://localhost:8443"
+# username: "admin"
+# password: "ubnt"
+# insecure: true
+# debug: true
+
+# ============================================================================
+# SECURITY NOTES
+# ============================================================================
+
+# 1. Store this file with restricted permissions:
+#    chmod 600 ~/.unifi-scheduler.yaml
+#
+# 2. For production, consider using environment variables instead:
+#    export UNIFI_PASSWORD="secret"
+#    unifi-scheduler client list
+#
+# 3. Never commit configuration files with real passwords to version control
+#
+# 4. The application automatically scrubs passwords from debug output
+#
+# 5. Use strong passwords and enable 2FA on your UniFi controller account

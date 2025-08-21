@@ -11,7 +11,24 @@ import (
 var natsConnectionsCmd = &cobra.Command{
 	Use:     "connections",
 	Aliases: []string{"conn"},
-	Short:   "show connection events",
+	Short:   "Display cached connection events from NATS storage",
+	Long: `Display recent UniFi connection events from NATS cache. This data is populated
+by a running 'unifi-scheduler nats agent' and provides fast access to network
+event history without querying the UniFi controller directly.
+
+Events shown include:
+  - Client connect/disconnect events
+  - Authentication successes and failures
+  - Network association changes
+  - Device status updates
+
+The display includes client names resolved from cached MAC-to-name mappings.
+Events are sorted by timestamp with most recent first.`,
+	Example: `  # Show cached connection events
+  unifi-scheduler --nats_url nats://server:4222 nats connections
+
+  # Use alias
+  unifi-scheduler --nats_url nats://server:4222 nats conn`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL), nats.OptCreds(natsCreds)}
 		s := nats.NewSubscriber(opts...)

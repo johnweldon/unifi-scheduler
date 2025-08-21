@@ -336,4 +336,3 @@ func TestSecureStringClear(t *testing.T) {
 		t.Errorf("String not cleared properly")
 	}
 }
-
