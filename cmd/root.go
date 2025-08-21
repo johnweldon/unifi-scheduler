@@ -29,6 +29,15 @@ var (
 	keychainService string
 	keychainAccount string
 
+	// TLS configuration options
+	tlsInsecure       bool
+	tlsMinVersion     string
+	tlsMaxVersion     string
+	tlsClientCertFile string
+	tlsClientKeyFile  string
+	tlsRootCAFile     string
+	tlsServerName     string
+
 	httpTimeout     time.Duration
 	natsConnTimeout time.Duration
 	natsOpTimeout   time.Duration
@@ -48,20 +57,23 @@ operations via NATS messaging.
 
 For complete documentation and examples, visit:
 https://github.com/johnweldon/unifi-scheduler`,
-	Example: `  # List all connected clients (using credential file)
+	Example: `  # List all connected clients (secure defaults)
   unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client list
 
-  # Block a client by name (using keychain)
-  unifi-scheduler --endpoint https://controller --keychain --keychain-account admin client block "Problem Device"
+  # Connect with custom TLS settings
+  unifi-scheduler --endpoint https://controller --tls-min-version 1.3 --keychain --keychain-account admin client list
 
-  # Monitor network events (using environment variables)
-  UNIFI_USERNAME=admin UNIFI_PASSWORD=secret unifi-scheduler --endpoint https://controller event list
+  # Connect with custom root CA (for self-signed certificates)
+  unifi-scheduler --endpoint https://controller --tls-root-ca /path/to/ca.pem --stdin client list
 
-  # Interactive credential input
-  unifi-scheduler --endpoint https://controller --stdin client list
+  # Connect with mutual TLS authentication
+  unifi-scheduler --endpoint https://controller --tls-client-cert /path/to/cert.pem --tls-client-key /path/to/key.pem client list
 
-  # Traditional username/password flags (less secure)
-  unifi-scheduler --endpoint https://controller --username admin --password pass client list
+  # Development mode (insecure - not for production)
+  unifi-scheduler --endpoint https://controller --tls-insecure --username admin --password pass client list
+
+  # Test TLS connection
+  unifi-scheduler tls test --endpoint https://controller
 
   # Use configuration file
   unifi-scheduler --config ~/.unifi-scheduler.yaml client list`,
@@ -102,6 +114,15 @@ func init() { // nolint: gochecknoinits
 	pf.BoolVar(&useKeychain, "keychain", false, "read credentials from system keychain")
 	pf.StringVar(&keychainService, "keychain-service", "unifi-scheduler", "keychain service name")
 	pf.StringVar(&keychainAccount, "keychain-account", "", "keychain account/username")
+
+	// TLS configuration flags
+	pf.BoolVar(&tlsInsecure, "tls-insecure", false, "skip TLS certificate verification (not recommended)")
+	pf.StringVar(&tlsMinVersion, "tls-min-version", "1.2", "minimum TLS version (1.0, 1.1, 1.2, 1.3)")
+	pf.StringVar(&tlsMaxVersion, "tls-max-version", "1.3", "maximum TLS version (1.0, 1.1, 1.2, 1.3)")
+	pf.StringVar(&tlsClientCertFile, "tls-client-cert", "", "client certificate file for mutual TLS")
+	pf.StringVar(&tlsClientKeyFile, "tls-client-key", "", "client private key file for mutual TLS")
+	pf.StringVar(&tlsRootCAFile, "tls-root-ca", "", "root CA certificate file")
+	pf.StringVar(&tlsServerName, "tls-server-name", "", "server name for certificate verification")
 
 	// Timeout configuration
 	pf.DurationVar(&httpTimeout, "http-timeout", 2*time.Minute, "HTTP request timeout")
@@ -212,11 +233,18 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		}, cmd.ErrOrStderr())
 	}
 
+	// Create TLS configuration
+	tlsConfig, err := createTLSConfig(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TLS configuration: %w", err)
+	}
+
 	options := []unifi.Option{
 		unifi.WithOut(outio),
 		unifi.WithErr(errio),
 		unifi.WithHTTPTimeout(httpTimeout),
 		unifi.WithCredentials(credentials),
+		unifi.WithTLSConfig(tlsConfig),
 	}
 
 	if debug {
@@ -293,4 +321,74 @@ func getSecureCredentials(cmd *cobra.Command) (*unifi.Credentials, error) {
 	}
 
 	return credentials, nil
+}
+
+// createTLSConfig creates TLS configuration from command line flags
+func createTLSConfig(cmd *cobra.Command) (*unifi.TLSConfig, error) {
+	var opts []unifi.TLSConfigOption
+
+	// Handle insecure mode
+	if tlsInsecure {
+		fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: TLS certificate verification is disabled. This is insecure and not recommended for production.\n")
+		opts = append(opts, unifi.WithInsecureSkipVerify(true))
+	}
+
+	// Parse TLS versions
+	if tlsMinVersion != "" {
+		minVer, err := parseTLSVersion(tlsMinVersion)
+		if err != nil {
+			return nil, fmt.Errorf("invalid minimum TLS version %q: %w", tlsMinVersion, err)
+		}
+		opts = append(opts, unifi.WithMinTLSVersion(minVer))
+	}
+
+	if tlsMaxVersion != "" {
+		maxVer, err := parseTLSVersion(tlsMaxVersion)
+		if err != nil {
+			return nil, fmt.Errorf("invalid maximum TLS version %q: %w", tlsMaxVersion, err)
+		}
+		opts = append(opts, unifi.WithMaxTLSVersion(maxVer))
+	}
+
+	// Client certificate for mutual TLS
+	if tlsClientCertFile != "" || tlsClientKeyFile != "" {
+		if tlsClientCertFile == "" || tlsClientKeyFile == "" {
+			return nil, fmt.Errorf("both --tls-client-cert and --tls-client-key must be specified for mutual TLS")
+		}
+		opts = append(opts, unifi.WithClientCertificate(tlsClientCertFile, tlsClientKeyFile))
+	}
+
+	// Root CA certificate
+	if tlsRootCAFile != "" {
+		opts = append(opts, unifi.WithRootCA(tlsRootCAFile))
+	}
+
+	// Server name override
+	if tlsServerName != "" {
+		opts = append(opts, unifi.WithServerName(tlsServerName))
+	}
+
+	// Create and validate configuration
+	config := unifi.NewTLSConfig(opts...)
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("TLS configuration validation failed: %w", err)
+	}
+
+	return config, nil
+}
+
+// parseTLSVersion converts string version to TLS constant
+func parseTLSVersion(version string) (uint16, error) {
+	switch version {
+	case "1.0":
+		return 0x0301, nil // tls.VersionTLS10
+	case "1.1":
+		return 0x0302, nil // tls.VersionTLS11
+	case "1.2":
+		return 0x0303, nil // tls.VersionTLS12
+	case "1.3":
+		return 0x0304, nil // tls.VersionTLS13
+	default:
+		return 0, fmt.Errorf("unsupported TLS version: %s (supported: 1.0, 1.1, 1.2, 1.3)", version)
+	}
 }

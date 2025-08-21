@@ -43,6 +43,7 @@ type Session struct {
 	httpTimeout    time.Duration
 	circuitBreaker *CircuitBreaker
 	pathValidator  PathValidator
+	tlsConfig      *TLSConfig
 }
 
 // Option describes an option parameter.
@@ -64,6 +65,20 @@ func WithCircuitBreakerConfig(config CircuitBreakerConfig) Option {
 func WithPathValidator(validator PathValidator) Option {
 	return func(s *Session) {
 		s.pathValidator = validator
+	}
+}
+
+// WithTLSConfig sets custom TLS configuration
+func WithTLSConfig(config *TLSConfig) Option {
+	return func(s *Session) {
+		s.tlsConfig = config
+	}
+}
+
+// WithInsecureTLS allows insecure TLS (for development only)
+func WithInsecureTLS() Option {
+	return func(s *Session) {
+		s.tlsConfig = InsecureTLSConfig()
 	}
 }
 
@@ -103,6 +118,7 @@ func (s *Session) Initialize(options ...Option) error {
 	s.httpTimeout = 2 * time.Minute // Default timeout
 	s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
 	s.pathValidator = NewDefaultPathValidator()
+	s.tlsConfig = DefaultTLSConfig()
 
 	for _, option := range options {
 		option(s)
@@ -134,15 +150,32 @@ func (s *Session) Initialize(options ...Option) error {
 		s.setErrorString("missing credentials")
 	}
 
+	// Validate endpoint supports HTTPS
+	if err := ValidateEndpointTLS(s.Endpoint, s.tlsConfig); err != nil {
+		s.setError(fmt.Errorf("endpoint TLS validation failed: %w", err))
+	}
+
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		s.setError(err)
 	}
 
+	// Create secure transport
+	secureTransport, err := s.tlsConfig.CreateSecureTransport()
+	if err != nil {
+		s.setError(fmt.Errorf("creating secure transport: %w", err))
+	}
+
+	// Wrap with logging if debug is enabled
+	var finalTransport http.RoundTripper = secureTransport
+	if s.dbgWriter != nil {
+		finalTransport = transport.NewLoggingTransport(secureTransport, transport.LoggingOutput(s.dbgWriter))
+	}
+
 	s.client = &http.Client{ // nolint:exhaustivestruct
 		Jar:       jar,
 		Timeout:   s.httpTimeout,
-		Transport: transport.NewLoggingTransport(http.DefaultTransport, transport.LoggingOutput(s.dbgWriter)),
+		Transport: finalTransport,
 	}
 
 	s.login = s.webLogin
