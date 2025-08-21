@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,7 +40,8 @@ type Session struct {
 	errWriter io.Writer
 	dbgWriter io.Writer
 
-	httpTimeout time.Duration
+	httpTimeout    time.Duration
+	circuitBreaker *CircuitBreaker
 }
 
 // Option describes an option parameter.
@@ -49,6 +51,21 @@ func WithOut(o io.Writer) Option             { return func(s *Session) { s.outWr
 func WithErr(e io.Writer) Option             { return func(s *Session) { s.errWriter = e } }
 func WithDbg(d io.Writer) Option             { return func(s *Session) { s.dbgWriter = d } }
 func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpTimeout = t } }
+
+// WithCircuitBreakerConfig sets the circuit breaker configuration
+func WithCircuitBreakerConfig(config CircuitBreakerConfig) Option {
+	return func(s *Session) {
+		s.circuitBreaker = NewCircuitBreaker(config)
+	}
+}
+
+// CircuitBreakerStats returns the current circuit breaker statistics
+func (s *Session) CircuitBreakerStats() CircuitBreakerStats {
+	if s.circuitBreaker == nil {
+		return CircuitBreakerStats{State: CircuitBreakerClosed}
+	}
+	return s.circuitBreaker.Stats()
+}
 
 // WithCredentials sets secure credentials for the session
 func WithCredentials(creds *Credentials) Option {
@@ -76,6 +93,7 @@ func (s *Session) Initialize(options ...Option) error {
 	s.outWriter = os.Stdout
 	s.errWriter = os.Stderr
 	s.httpTimeout = 2 * time.Minute // Default timeout
+	s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
 
 	for _, option := range options {
 		option(s)
@@ -718,58 +736,79 @@ func (s *Session) put(u fmt.Stringer, body io.Reader) (string, error) {
 }
 
 func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
-	defer cancel()
+	var result string
+	var responseError error
 
-	req, err := http.NewRequestWithContext(ctx, verb, u.String(), body)
-	if err != nil {
-		s.setError(err)
+	// Execute the HTTP request through the circuit breaker
+	err := s.circuitBreaker.Execute(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
+		defer cancel()
 
-		return "", s.err
-	}
-
-	req.Header.Set("User-Agent", "unifibot 2.0")
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Origin", s.Endpoint)
-
-	if s.csrf != "" {
-		req.Header.Set("x-csrf-token", s.csrf)
-	}
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-	defer resp.Body.Close()
-
-	if tok := resp.Header.Get("x-csrf-token"); tok != "" {
-		s.csrf = tok
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		s.setError(err)
-
-		return "", s.err
-	}
-
-	if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
-		if resp.StatusCode == http.StatusUnauthorized {
-			fmt.Fprintf(s.errWriter, "\nlogged out; re-authenticating\n")
-			s.login = s.webLogin
-			if r, err := s.login(); err != nil {
-				s.setError(err)
-				return r, fmt.Errorf("login attempt failed: %w", err)
-			}
-		} else {
-			return string(respBody), fmt.Errorf("http error: %s", resp.Status)
+		req, err := http.NewRequestWithContext(ctx, verb, u.String(), body)
+		if err != nil {
+			return err
 		}
+
+		req.Header.Set("User-Agent", "unifibot 2.0")
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Origin", s.Endpoint)
+
+		if s.csrf != "" {
+			req.Header.Set("x-csrf-token", s.csrf)
+		}
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if tok := resp.Header.Get("x-csrf-token"); tok != "" {
+			s.csrf = tok
+		}
+
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
+			if resp.StatusCode == http.StatusUnauthorized {
+				fmt.Fprintf(s.errWriter, "\nlogged out; re-authenticating\n")
+				s.login = s.webLogin
+				if _, err := s.login(); err != nil {
+					return fmt.Errorf("login attempt failed: %w", err)
+				}
+				// Return non-fatal error for re-authentication, which circuit breaker should not count as failure
+				responseError = fmt.Errorf("re-authentication required")
+				result = string(respBody)
+				return nil
+			} else {
+				return fmt.Errorf("http error: %s", resp.Status)
+			}
+		}
+
+		result = string(respBody)
+		return nil
+	})
+	// Handle circuit breaker errors
+	if err != nil {
+		if errors.Is(err, ErrCircuitBreakerOpen) {
+			s.setError(err)
+			return "", fmt.Errorf("circuit breaker open, service unavailable: %w", err)
+		}
+		s.setError(err)
+		return "", s.err
 	}
 
-	return string(respBody), s.err
+	// Handle authentication errors that are not circuit breaker failures
+	if responseError != nil {
+		s.setError(responseError)
+		return result, s.err
+	}
+
+	return result, s.err
 }
 
 func (s *Session) setError(e error) {
