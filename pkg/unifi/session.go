@@ -42,6 +42,7 @@ type Session struct {
 
 	httpTimeout    time.Duration
 	circuitBreaker *CircuitBreaker
+	pathValidator  PathValidator
 }
 
 // Option describes an option parameter.
@@ -56,6 +57,13 @@ func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpT
 func WithCircuitBreakerConfig(config CircuitBreakerConfig) Option {
 	return func(s *Session) {
 		s.circuitBreaker = NewCircuitBreaker(config)
+	}
+}
+
+// WithPathValidator sets a custom path validator
+func WithPathValidator(validator PathValidator) Option {
+	return func(s *Session) {
+		s.pathValidator = validator
 	}
 }
 
@@ -94,6 +102,7 @@ func (s *Session) Initialize(options ...Option) error {
 	s.errWriter = os.Stderr
 	s.httpTimeout = 2 * time.Minute // Default timeout
 	s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
+	s.pathValidator = NewDefaultPathValidator()
 
 	for _, option := range options {
 		option(s)
@@ -356,7 +365,35 @@ func (s *Session) GetMACsBy(ids ...string) ([]MAC, error) {
 
 // Raw executes arbitrary endpoints.
 func (s *Session) Raw(method, path string, body io.Reader) (string, error) {
-	return s.action(method, path, body)
+	// Validate HTTP method
+	if err := ValidateHTTPMethod(method); err != nil {
+		return "", fmt.Errorf("raw command validation failed: %w", err)
+	}
+
+	// Sanitize and validate path
+	sanitizedPath := SanitizeInput(path)
+	if err := s.pathValidator.ValidatePath(sanitizedPath); err != nil {
+		return "", fmt.Errorf("raw command path validation failed: %w", err)
+	}
+
+	// Validate payload if present
+	if body != nil {
+		// Read the body to validate it
+		var bodyBytes []byte
+		var err error
+		if bodyBytes, err = io.ReadAll(body); err != nil {
+			return "", fmt.Errorf("raw command failed to read body: %w", err)
+		}
+
+		if err := ValidatePayload(bodyBytes); err != nil {
+			return "", fmt.Errorf("raw command payload validation failed: %w", err)
+		}
+
+		// Recreate the reader with validated content
+		body = bytes.NewReader(bodyBytes)
+	}
+
+	return s.action(method, sanitizedPath, body)
 }
 
 // ListEvents describes the latest events.
