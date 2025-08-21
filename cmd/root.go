@@ -97,30 +97,44 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	postInitConfig(rootCmd.Commands())
+	if err := postInitConfig(rootCmd.Commands()); err != nil {
+		fmt.Fprintf(os.Stderr, "Error during configuration: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-func postInitConfig(commands []*cobra.Command) {
+func postInitConfig(commands []*cobra.Command) error {
 	for _, cmd := range commands {
-		presetRequiredFlags(cmd)
+		if err := presetRequiredFlags(cmd); err != nil {
+			return err
+		}
 		if cmd.HasSubCommands() {
-			postInitConfig(cmd.Commands())
+			if err := postInitConfig(cmd.Commands()); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func presetRequiredFlags(cmd *cobra.Command) {
+func presetRequiredFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlags(cmd.Flags()); err != nil {
-		panic(err)
+		return fmt.Errorf("binding flags for command %q: %w", cmd.Name(), err)
 	}
 
+	var flagError error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if flagError != nil {
+			return // Stop processing if we already have an error
+		}
 		if viper.IsSet(f.Name) && viper.GetString(f.Name) != "" {
 			if err := cmd.Flags().Set(f.Name, viper.GetString(f.Name)); err != nil {
-				panic(err)
+				flagError = fmt.Errorf("setting flag %q for command %q: %w", f.Name, cmd.Name(), err)
 			}
 		}
 	})
+
+	return flagError
 }
 
 const (
