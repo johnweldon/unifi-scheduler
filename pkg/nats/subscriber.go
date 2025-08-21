@@ -104,7 +104,12 @@ func (s *Subscriber) subscribe(ctx context.Context, subjects ...string) (<-chan 
 
 	for _, sub := range subscriptions {
 		go func(ctx context.Context, ss *nats.Subscription, evt chan<- string) {
-			defer func() { _ = ss.Unsubscribe() }()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("panic in subscription goroutine: %v", r)
+				}
+				_ = ss.Unsubscribe()
+			}()
 
 			for {
 				select {
@@ -174,6 +179,11 @@ func (s *Subscriber) subscribeStream(ctx context.Context, subjects ...string) (<
 
 	for _, cons := range consumers {
 		go func(ctx context.Context, cons jetstream.Consumer, evt chan<- string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("panic in stream subscription goroutine: %v", r)
+				}
+			}()
 			for {
 				select {
 				case <-ctx.Done():
@@ -198,7 +208,7 @@ func (s *Subscriber) subscribeStream(ctx context.Context, subjects ...string) (<
 					}
 				}
 			}
-		}(context.Background(), cons, evt)
+		}(ctx, cons, evt)
 	}
 
 	return evt, nil

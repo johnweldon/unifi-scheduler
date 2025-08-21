@@ -49,7 +49,14 @@ func (a *Agent) Start(ctx context.Context) error {
 		return fmt.Errorf("health check failed: %w", err)
 	}
 
-	go a.serve(ctx)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic in agent serve goroutine: %v", r)
+			}
+		}()
+		a.serve(ctx)
+	}()
 
 	return nil
 }
@@ -163,7 +170,7 @@ func (a *Agent) refreshClientsWithContext(ctx context.Context) error {
 			return fmt.Errorf("get clients: %w", err)
 		}
 
-		if err = a.publish("clients", clients); err != nil {
+		if err = a.publishWithContext(ctx, "clients", clients); err != nil {
 			return err
 		}
 
@@ -186,7 +193,7 @@ func (a *Agent) refreshUsersWithContext(ctx context.Context) error {
 			return fmt.Errorf("get users: %w", err)
 		}
 
-		if err = a.publish("users", users); err != nil {
+		if err = a.publishWithContext(ctx, "users", users); err != nil {
 			return err
 		}
 
@@ -212,7 +219,7 @@ func (a *Agent) refreshDevicesWithContext(ctx context.Context) error {
 			return fmt.Errorf("get devices: %w", err)
 		}
 
-		if err = a.publish(DevicesSubject, devices); err != nil {
+		if err = a.publishWithContext(ctx, DevicesSubject, devices); err != nil {
 			return err
 		}
 
@@ -265,7 +272,11 @@ func (a *Agent) refreshLookupsWithContext(ctx context.Context) error {
 }
 
 func (a *Agent) publish(subject string, msg any) error {
-	if err := a.publisher.Publish(subSubject(a.base, subject), msg); err != nil {
+	return a.publishWithContext(context.Background(), subject, msg)
+}
+
+func (a *Agent) publishWithContext(ctx context.Context, subject string, msg any) error {
+	if err := a.publisher.PublishWithContext(ctx, subSubject(a.base, subject), msg); err != nil {
 		return fmt.Errorf("publish: %w", err)
 	}
 

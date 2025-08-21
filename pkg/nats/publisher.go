@@ -29,6 +29,10 @@ func (n *Publisher) StoreWithContext(ctx context.Context, bucket, key string, va
 
 func (n *Publisher) Publish(subject string, msg any) error { return n.publish(subject, msg) }
 
+func (n *Publisher) PublishWithContext(ctx context.Context, subject string, msg any) error {
+	return n.publishWithContext(ctx, subject, msg)
+}
+
 func (n *Publisher) PublishStream(stream, subject string, msg any) error {
 	return n.PublishStreamWithContext(context.Background(), stream, subject, msg)
 }
@@ -38,6 +42,10 @@ func (n *Publisher) PublishStreamWithContext(ctx context.Context, stream, subjec
 }
 
 func (n *Publisher) publish(subject string, msg any) error {
+	return n.publishWithContext(context.Background(), subject, msg)
+}
+
+func (n *Publisher) publishWithContext(ctx context.Context, subject string, msg any) error {
 	var (
 		err  error
 		data []byte
