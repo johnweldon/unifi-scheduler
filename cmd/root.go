@@ -167,22 +167,28 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		Endpoint: endpoint,
 	}
 
+	var outio, errio io.Writer
+
 	nc, err := nats.Connect(natsURL)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "error connecting to NATS: %v\n", err)
+		// Continue without NATS logging
+		if debug {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not connect to NATS (%v), continuing without NATS logging\n", err)
+		}
+		outio = cmd.OutOrStdout()
+		errio = cmd.ErrOrStderr()
+	} else {
+		// NATS connection successful
+		outio = io.MultiWriter(&lnats.Logger{
+			Connection:     nc,
+			PublishSubject: "log.info",
+		}, cmd.OutOrStdout())
 
-		return nil, err
+		errio = io.MultiWriter(&lnats.Logger{
+			Connection:     nc,
+			PublishSubject: "log.error",
+		}, cmd.ErrOrStderr())
 	}
-
-	outio := io.MultiWriter(&lnats.Logger{
-		Connection:     nc,
-		PublishSubject: "log.info",
-	}, cmd.OutOrStdout())
-
-	errio := io.MultiWriter(&lnats.Logger{
-		Connection:     nc,
-		PublishSubject: "log.error",
-	}, cmd.ErrOrStderr())
 
 	options := []unifi.Option{
 		unifi.WithOut(outio),

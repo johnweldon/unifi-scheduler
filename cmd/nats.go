@@ -41,14 +41,15 @@ const (
 )
 
 var (
-	natsURL   = "nats://localhost:4222"
+	natsURL   = ""
 	natsCreds = ""
 )
 
 func init() { // nolint: gochecknoinits
 	pf := natsCmd.PersistentFlags()
 
-	pf.StringVar(&natsURL, natsURLFlag, natsURL, "NATS server URL (e.g., nats://localhost:4222)")
+	pf.StringVar(&natsURL, natsURLFlag, "nats://localhost:4222", "NATS server URL (e.g., nats://localhost:4222)")
+	// NATS URL is required only for NATS commands
 	_ = cobra.MarkFlagRequired(pf, natsURLFlag)
 
 	pf.StringVar(&natsCreds, natsCredsFlag, natsCreds, "NATS credentials file path for authentication")
