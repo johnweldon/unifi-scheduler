@@ -18,12 +18,21 @@ var natsAgentCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Printf("Version: %s\n", Version)
 
-		ctx, _ := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
 
 		ses, err := initSession(cmd)
 		cobra.CheckErr(err)
 
-		opts := []nats.ClientOpt{nats.OptNATSUrl(natsURL), nats.OptCreds(natsCreds)}
+		opts := []nats.ClientOpt{
+			nats.OptNATSUrl(natsURL),
+			nats.OptCreds(natsCreds),
+			nats.OptConnectTimeout(natsConnTimeout),
+			nats.OptWriteTimeout(natsConnTimeout),
+			nats.OptOperationTimeout(natsOpTimeout),
+			nats.OptStreamReplicas(streamReplicas),
+			nats.OptKVReplicas(kvReplicas),
+		}
 
 		a := nats.NewAgent(ses, baseSubject, opts...)
 		cobra.CheckErr(a.Start(ctx))

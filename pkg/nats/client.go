@@ -12,8 +12,11 @@ import (
 )
 
 var (
-	DefaultConnectTimeout = 15 * time.Second
-	DefaultWriteTimeout   = 30 * time.Second
+	DefaultConnectTimeout   = 15 * time.Second
+	DefaultWriteTimeout     = 30 * time.Second
+	DefaultOperationTimeout = 30 * time.Second
+	DefaultStreamReplicas   = 3
+	DefaultKVReplicas       = 3
 )
 
 type ClientOpt func(*Client)
@@ -30,15 +33,48 @@ func OptBuckets(names ...string) ClientOpt {
 	return func(c *Client) { c.buckets = append(c.buckets, names...) }
 }
 
+func OptConnectTimeout(t time.Duration) ClientOpt {
+	return func(c *Client) { c.connectTimeout = t }
+}
+
+func OptWriteTimeout(t time.Duration) ClientOpt {
+	return func(c *Client) { c.writeTimeout = t }
+}
+
+func OptOperationTimeout(t time.Duration) ClientOpt {
+	return func(c *Client) { c.operationTimeout = t }
+}
+
+func OptStreamReplicas(r int) ClientOpt {
+	return func(c *Client) { c.streamReplicas = r }
+}
+
+func OptKVReplicas(r int) ClientOpt {
+	return func(c *Client) { c.kvReplicas = r }
+}
+
 type Client struct {
 	connURL   string
 	credsFile string
 	conn      *nats.Conn
 	streams   []string
 	buckets   []string
+
+	connectTimeout   time.Duration
+	writeTimeout     time.Duration
+	operationTimeout time.Duration
+	streamReplicas   int
+	kvReplicas       int
 }
 
 func (n *Client) Init(opts ...ClientOpt) {
+	// Set defaults
+	n.connectTimeout = DefaultConnectTimeout
+	n.writeTimeout = DefaultWriteTimeout
+	n.operationTimeout = DefaultOperationTimeout
+	n.streamReplicas = DefaultStreamReplicas
+	n.kvReplicas = DefaultKVReplicas
+
 	for _, opt := range opts {
 		opt(n)
 	}
@@ -59,8 +95,8 @@ func (n *Client) ensureConnection() error {
 	}
 
 	opts := []nats.Option{
-		nats.Timeout(DefaultConnectTimeout),
-		nats.FlusherTimeout(DefaultWriteTimeout),
+		nats.Timeout(n.connectTimeout),
+		nats.FlusherTimeout(n.writeTimeout),
 	}
 
 	if len(n.credsFile) != 0 {
@@ -83,6 +119,10 @@ func (n *Client) ensureConnection() error {
 }
 
 func (n *Client) ensureStreams() error {
+	return n.ensureStreamsWithContext(context.Background())
+}
+
+func (n *Client) ensureStreamsWithContext(ctx context.Context) error {
 	var (
 		err error
 		js  jetstream.JetStream
@@ -100,20 +140,23 @@ func (n *Client) ensureStreams() error {
 			Discard:    jetstream.DiscardOld,
 			Retention:  jetstream.LimitsPolicy,
 			MaxMsgs:    1000,
-			Replicas:   3,
+			Replicas:   n.streamReplicas,
 		}
 
-		if _, err = js.Stream(context.Background(), stream); err != nil {
+		opCtx, cancel := context.WithTimeout(ctx, n.operationTimeout)
+		defer cancel()
+
+		if _, err = js.Stream(opCtx, stream); err != nil {
 			if !errors.Is(err, jetstream.ErrStreamNotFound) {
 				return fmt.Errorf("ensureStreams: getting stream info %q: %w", stream, err)
 			}
 
-			if _, err = js.CreateStream(context.Background(), cfg); err != nil {
+			if _, err = js.CreateStream(opCtx, cfg); err != nil {
 				return fmt.Errorf("ensureStreams: creating stream %q: %w", stream, err)
 			}
 		}
 
-		if _, err = js.UpdateStream(context.Background(), cfg); err != nil {
+		if _, err = js.UpdateStream(opCtx, cfg); err != nil {
 			return fmt.Errorf("ensureStreams: updating stream %q: %w", stream, err)
 		}
 	}
@@ -122,6 +165,10 @@ func (n *Client) ensureStreams() error {
 }
 
 func (n *Client) ensureBuckets() error {
+	return n.ensureBucketsWithContext(context.Background())
+}
+
+func (n *Client) ensureBucketsWithContext(ctx context.Context) error {
 	var (
 		err error
 		js  jetstream.JetStream
@@ -132,7 +179,10 @@ func (n *Client) ensureBuckets() error {
 	}
 
 	for _, bucket := range n.buckets {
-		if _, err = js.KeyValue(context.Background(), bucket); err != nil {
+		opCtx, cancel := context.WithTimeout(ctx, n.operationTimeout)
+		defer cancel()
+
+		if _, err = js.KeyValue(opCtx, bucket); err != nil {
 			if !errors.Is(err, jetstream.ErrBucketNotFound) {
 				return fmt.Errorf("ensureBuckets: getting bucket %q: %w", bucket, err)
 			}
@@ -140,10 +190,10 @@ func (n *Client) ensureBuckets() error {
 			cfg := jetstream.KeyValueConfig{
 				Bucket:   bucket,
 				TTL:      90 * 24 * time.Hour,
-				Replicas: 3,
+				Replicas: n.kvReplicas,
 			}
 
-			if _, err = js.CreateKeyValue(context.Background(), cfg); err != nil {
+			if _, err = js.CreateKeyValue(opCtx, cfg); err != nil {
 				return fmt.Errorf("ensureBuckets: creating bucket %q: %w", bucket, err)
 			}
 		}

@@ -19,12 +19,22 @@ type Publisher struct {
 	Client
 }
 
-func (n *Publisher) Store(bucket, key string, val any) error { return n.store(bucket, key, val) }
+func (n *Publisher) Store(bucket, key string, val any) error {
+	return n.StoreWithContext(context.Background(), bucket, key, val)
+}
+
+func (n *Publisher) StoreWithContext(ctx context.Context, bucket, key string, val any) error {
+	return n.storeWithContext(ctx, bucket, key, val)
+}
 
 func (n *Publisher) Publish(subject string, msg any) error { return n.publish(subject, msg) }
 
 func (n *Publisher) PublishStream(stream, subject string, msg any) error {
-	return n.publishStream(fmt.Sprintf("%s.%s", stream, subject), msg)
+	return n.PublishStreamWithContext(context.Background(), stream, subject, msg)
+}
+
+func (n *Publisher) PublishStreamWithContext(ctx context.Context, stream, subject string, msg any) error {
+	return n.publishStreamWithContext(ctx, fmt.Sprintf("%s.%s", stream, subject), msg)
 }
 
 func (n *Publisher) publish(subject string, msg any) error {
@@ -49,6 +59,10 @@ func (n *Publisher) publish(subject string, msg any) error {
 }
 
 func (n *Publisher) publishStream(stream string, msg any) error {
+	return n.publishStreamWithContext(context.Background(), stream, msg)
+}
+
+func (n *Publisher) publishStreamWithContext(ctx context.Context, stream string, msg any) error {
 	var (
 		err  error
 		data []byte
@@ -78,7 +92,10 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 		Data:    data,
 	}
 
-	if _, err = js.PublishMsg(context.Background(), pmsg); err != nil {
+	opCtx, cancel := context.WithTimeout(ctx, n.operationTimeout)
+	defer cancel()
+
+	if _, err = js.PublishMsg(opCtx, pmsg); err != nil {
 		return fmt.Errorf("publishStream: cannot publish data: %w", err)
 	}
 
@@ -86,6 +103,10 @@ func (n *Publisher) publishStream(stream string, msg any) error {
 }
 
 func (n *Publisher) store(bucket, key string, val any) error {
+	return n.storeWithContext(context.Background(), bucket, key, val)
+}
+
+func (n *Publisher) storeWithContext(ctx context.Context, bucket, key string, val any) error {
 	var (
 		err  error
 		data []byte
@@ -101,7 +122,10 @@ func (n *Publisher) store(bucket, key string, val any) error {
 		return fmt.Errorf("store: cannot get jetstream: %w", err)
 	}
 
-	if kv, err = js.KeyValue(context.Background(), bucket); err != nil {
+	opCtx, cancel := context.WithTimeout(ctx, n.operationTimeout)
+	defer cancel()
+
+	if kv, err = js.KeyValue(opCtx, bucket); err != nil {
 		return fmt.Errorf("store: cannot get bucket %q: %w", bucket, err)
 	}
 
@@ -109,7 +133,7 @@ func (n *Publisher) store(bucket, key string, val any) error {
 		return fmt.Errorf("store: cannot marshal data: %w", err)
 	}
 
-	if _, err = kv.Put(context.Background(), key, data); err != nil {
+	if _, err = kv.Put(opCtx, key, data); err != nil {
 		return fmt.Errorf("store: cannot put in bucket %q: %w", bucket, err)
 	}
 

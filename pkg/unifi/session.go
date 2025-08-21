@@ -35,14 +35,17 @@ type Session struct {
 	outWriter io.Writer
 	errWriter io.Writer
 	dbgWriter io.Writer
+
+	httpTimeout time.Duration
 }
 
 // Option describes an option parameter.
 type Option func(*Session)
 
-func WithOut(o io.Writer) Option { return func(s *Session) { s.outWriter = o } }
-func WithErr(e io.Writer) Option { return func(s *Session) { s.errWriter = e } }
-func WithDbg(d io.Writer) Option { return func(s *Session) { s.dbgWriter = d } }
+func WithOut(o io.Writer) Option             { return func(s *Session) { s.outWriter = o } }
+func WithErr(e io.Writer) Option             { return func(s *Session) { s.errWriter = e } }
+func WithDbg(d io.Writer) Option             { return func(s *Session) { s.dbgWriter = d } }
+func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpTimeout = t } }
 
 // Initialize prepares the session for use.
 func (s *Session) Initialize(options ...Option) error {
@@ -52,6 +55,7 @@ func (s *Session) Initialize(options ...Option) error {
 
 	s.outWriter = os.Stdout
 	s.errWriter = os.Stderr
+	s.httpTimeout = 2 * time.Minute // Default timeout
 
 	for _, option := range options {
 		option(s)
@@ -78,7 +82,7 @@ func (s *Session) Initialize(options ...Option) error {
 
 	s.client = &http.Client{ // nolint:exhaustivestruct
 		Jar:       jar,
-		Timeout:   time.Minute * 1,
+		Timeout:   s.httpTimeout,
 		Transport: transport.NewLoggingTransport(http.DefaultTransport, transport.LoggingOutput(s.dbgWriter)),
 	}
 
@@ -670,7 +674,10 @@ func (s *Session) put(u fmt.Stringer, body io.Reader) (string, error) {
 }
 
 func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, error) {
-	req, err := http.NewRequestWithContext(context.Background(), verb, u.String(), body)
+	ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, verb, u.String(), body)
 	if err != nil {
 		s.setError(err)
 

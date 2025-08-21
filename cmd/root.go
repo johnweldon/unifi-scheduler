@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
@@ -20,6 +21,12 @@ var (
 	username string
 	password string
 	endpoint string
+
+	httpTimeout     time.Duration
+	natsConnTimeout time.Duration
+	natsOpTimeout   time.Duration
+	streamReplicas  int
+	kvReplicas      int
 
 	Version string
 )
@@ -60,6 +67,13 @@ func init() { // nolint: gochecknoinits
 
 	pf.StringVar(&endpoint, endpointFlag, endpoint, "unifi endpoint")
 	_ = cobra.MarkFlagRequired(pf, endpointFlag)
+
+	// Timeout configuration
+	pf.DurationVar(&httpTimeout, "http-timeout", 2*time.Minute, "HTTP request timeout")
+	pf.DurationVar(&natsConnTimeout, "nats-conn-timeout", 15*time.Second, "NATS connection timeout")
+	pf.DurationVar(&natsOpTimeout, "nats-op-timeout", 30*time.Second, "NATS operation timeout")
+	pf.IntVar(&streamReplicas, "stream-replicas", 3, "NATS stream replica count")
+	pf.IntVar(&kvReplicas, "kv-replicas", 3, "NATS key-value replica count")
 
 	rootCmd.AddCommand(versionCmd)
 }
@@ -142,6 +156,7 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 	options := []unifi.Option{
 		unifi.WithOut(outio),
 		unifi.WithErr(errio),
+		unifi.WithHTTPTimeout(httpTimeout),
 	}
 
 	if debug {
