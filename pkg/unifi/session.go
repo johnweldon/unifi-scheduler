@@ -44,6 +44,7 @@ type Session struct {
 	circuitBreaker *CircuitBreaker
 	pathValidator  PathValidator
 	tlsConfig      *TLSConfig
+	backoffRetry   *BackoffRetry
 }
 
 // Option describes an option parameter.
@@ -58,6 +59,13 @@ func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpT
 func WithCircuitBreakerConfig(config CircuitBreakerConfig) Option {
 	return func(s *Session) {
 		s.circuitBreaker = NewCircuitBreaker(config)
+	}
+}
+
+// WithBackoffConfig sets the backoff retry configuration
+func WithBackoffConfig(config BackoffConfig) Option {
+	return func(s *Session) {
+		s.backoffRetry = NewBackoffRetry(config)
 	}
 }
 
@@ -90,6 +98,14 @@ func (s *Session) CircuitBreakerStats() CircuitBreakerStats {
 	return s.circuitBreaker.Stats()
 }
 
+// BackoffStats returns the current backoff retry statistics
+func (s *Session) BackoffStats() BackoffStats {
+	if s.backoffRetry == nil {
+		return BackoffStats{Strategy: BackoffExponential}
+	}
+	return s.backoffRetry.Stats()
+}
+
 // WithCredentials sets secure credentials for the session
 func WithCredentials(creds *Credentials) Option {
 	return func(s *Session) { s.Credentials = creds }
@@ -119,6 +135,7 @@ func (s *Session) Initialize(options ...Option) error {
 	s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
 	s.pathValidator = NewDefaultPathValidator()
 	s.tlsConfig = DefaultTLSConfig()
+	s.backoffRetry = NewBackoffRetry(UniFiRetryConfig())
 
 	for _, option := range options {
 		option(s)
@@ -809,60 +826,82 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 	var result string
 	var responseError error
 
-	// Execute the HTTP request through the circuit breaker
-	err := s.circuitBreaker.Execute(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
-		defer cancel()
+	// Create a context for the entire operation with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
+	defer cancel()
 
-		req, err := http.NewRequestWithContext(ctx, verb, u.String(), body)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set("User-Agent", "unifibot 2.0")
-		req.Header.Set("Content-Type", "application/json; charset=utf-8")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Origin", s.Endpoint)
-
-		if s.csrf != "" {
-			req.Header.Set("x-csrf-token", s.csrf)
-		}
-
-		resp, err := s.client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if tok := resp.Header.Get("x-csrf-token"); tok != "" {
-			s.csrf = tok
-		}
-
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-
-		if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
-			if resp.StatusCode == http.StatusUnauthorized {
-				fmt.Fprintf(s.errWriter, "\nlogged out; re-authenticating\n")
-				s.login = s.webLogin
-				if _, err := s.login(); err != nil {
-					return fmt.Errorf("login attempt failed: %w", err)
-				}
-				// Return non-fatal error for re-authentication, which circuit breaker should not count as failure
-				responseError = fmt.Errorf("re-authentication required")
-				result = string(respBody)
-				return nil
+	// Execute the HTTP request through backoff retry which wraps the circuit breaker
+	err := s.backoffRetry.Retry(ctx, func() error {
+		// Copy the body if it's provided, since it may need to be read multiple times on retry
+		var requestBody io.Reader
+		if body != nil {
+			if bodyBytes, readErr := io.ReadAll(body); readErr == nil {
+				requestBody = bytes.NewReader(bodyBytes)
 			} else {
-				return fmt.Errorf("http error: %s", resp.Status)
+				return fmt.Errorf("failed to read request body: %w", readErr)
 			}
 		}
 
-		result = string(respBody)
-		return nil
+		// Execute the HTTP request through the circuit breaker
+		return s.circuitBreaker.Execute(func() error {
+			req, err := http.NewRequestWithContext(ctx, verb, u.String(), requestBody)
+			if err != nil {
+				return err
+			}
+
+			req.Header.Set("User-Agent", "unifibot 2.0")
+			req.Header.Set("Content-Type", "application/json; charset=utf-8")
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Origin", s.Endpoint)
+
+			if s.csrf != "" {
+				req.Header.Set("x-csrf-token", s.csrf)
+			}
+
+			resp, err := s.client.Do(req)
+			if err != nil {
+				// Check if this is a retryable network error
+				if IsRetryableNetworkError(err) {
+					return fmt.Errorf("%w: %v", ErrRetryableHTTP, err)
+				}
+				return err
+			}
+			defer resp.Body.Close()
+
+			if tok := resp.Header.Get("x-csrf-token"); tok != "" {
+				s.csrf = tok
+			}
+
+			respBody, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			if resp.StatusCode < http.StatusOK || http.StatusBadRequest <= resp.StatusCode {
+				if resp.StatusCode == http.StatusUnauthorized {
+					fmt.Fprintf(s.errWriter, "\nlogged out; re-authenticating\n")
+					s.login = s.webLogin
+					if _, err := s.login(); err != nil {
+						return fmt.Errorf("login attempt failed: %w", err)
+					}
+					// Return retryable error for re-authentication
+					responseError = fmt.Errorf("re-authentication required")
+					result = string(respBody)
+					return fmt.Errorf("%w: re-authentication required", ErrRetryableHTTP)
+				} else if IsRetryableHTTPError(resp.StatusCode) {
+					// Return retryable error for HTTP errors that should be retried
+					return fmt.Errorf("%w: http error: %s", ErrRetryableHTTP, resp.Status)
+				} else {
+					// Non-retryable HTTP error
+					return fmt.Errorf("http error: %s", resp.Status)
+				}
+			}
+
+			result = string(respBody)
+			return nil
+		})
 	})
-	// Handle circuit breaker errors
+	// Handle errors from retry/circuit breaker
 	if err != nil {
 		if errors.Is(err, ErrCircuitBreakerOpen) {
 			s.setError(err)
@@ -872,7 +911,7 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 		return "", s.err
 	}
 
-	// Handle authentication errors that are not circuit breaker failures
+	// Handle authentication errors that succeeded with retry
 	if responseError != nil {
 		s.setError(responseError)
 		return result, s.err
