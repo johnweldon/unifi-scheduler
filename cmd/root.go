@@ -22,6 +22,13 @@ var (
 	password string
 	endpoint string
 
+	// Secure credential input options
+	credentialFile  string
+	useStdin        bool
+	useKeychain     bool
+	keychainService string
+	keychainAccount string
+
 	httpTimeout     time.Duration
 	natsConnTimeout time.Duration
 	natsOpTimeout   time.Duration
@@ -41,14 +48,20 @@ operations via NATS messaging.
 
 For complete documentation and examples, visit:
 https://github.com/johnweldon/unifi-scheduler`,
-	Example: `  # List all connected clients
+	Example: `  # List all connected clients (using credential file)
+  unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client list
+
+  # Block a client by name (using keychain)
+  unifi-scheduler --endpoint https://controller --keychain --keychain-account admin client block "Problem Device"
+
+  # Monitor network events (using environment variables)
+  UNIFI_USERNAME=admin UNIFI_PASSWORD=secret unifi-scheduler --endpoint https://controller event list
+
+  # Interactive credential input
+  unifi-scheduler --endpoint https://controller --stdin client list
+
+  # Traditional username/password flags (less secure)
   unifi-scheduler --endpoint https://controller --username admin --password pass client list
-
-  # Block a client by name
-  unifi-scheduler --endpoint https://controller --username admin --password pass client block "Problem Device"
-
-  # Monitor network events
-  unifi-scheduler --endpoint https://controller --username admin --password pass event list
 
   # Use configuration file
   unifi-scheduler --config ~/.unifi-scheduler.yaml client list`,
@@ -78,14 +91,17 @@ func init() { // nolint: gochecknoinits
 	pf.StringVar(&cfgFile, "config", "", "config file (default is $HOME/.unifi-scheduler.yaml)")
 	pf.BoolVar(&debug, "debug", debug, "debug output")
 
-	pf.StringVar(&username, usernameFlag, username, "unifi username")
-	_ = cobra.MarkFlagRequired(pf, usernameFlag)
-
-	pf.StringVar(&password, passwordFlag, password, "unifi password")
-	_ = cobra.MarkFlagRequired(pf, passwordFlag)
-
+	pf.StringVar(&username, usernameFlag, username, "unifi username (optional if using secure credential input)")
+	pf.StringVar(&password, passwordFlag, password, "unifi password (optional if using secure credential input)")
 	pf.StringVar(&endpoint, endpointFlag, endpoint, "unifi endpoint")
 	_ = cobra.MarkFlagRequired(pf, endpointFlag)
+
+	// Secure credential input flags
+	pf.StringVar(&credentialFile, "credential-file", "", "path to JSON credential file")
+	pf.BoolVar(&useStdin, "stdin", false, "read credentials from stdin")
+	pf.BoolVar(&useKeychain, "keychain", false, "read credentials from system keychain")
+	pf.StringVar(&keychainService, "keychain-service", "unifi-scheduler", "keychain service name")
+	pf.StringVar(&keychainAccount, "keychain-account", "", "keychain account/username")
 
 	// Timeout configuration
 	pf.DurationVar(&httpTimeout, "http-timeout", 2*time.Minute, "HTTP request timeout")
@@ -163,6 +179,12 @@ const (
 )
 
 func initSession(cmd *cobra.Command) (*unifi.Session, error) {
+	// Get credentials using secure credential management
+	credentials, err := getSecureCredentials(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain credentials: %w", err)
+	}
+
 	ses := &unifi.Session{
 		Endpoint: endpoint,
 	}
@@ -194,12 +216,12 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		unifi.WithOut(outio),
 		unifi.WithErr(errio),
 		unifi.WithHTTPTimeout(httpTimeout),
-		unifi.WithSecureAuth(username, password),
+		unifi.WithCredentials(credentials),
 	}
 
 	if debug {
 		// Use secure logging to prevent credential leakage in debug output
-		options = append(options, unifi.SecureLogOption(cmd.OutOrStderr()))
+		options = append(options, unifi.WithDbg(unifi.NewSecureWriter(cmd.OutOrStderr())))
 	}
 
 	if err := ses.Initialize(options...); err != nil {
@@ -215,4 +237,60 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 	}
 
 	return ses, nil
+}
+
+// getSecureCredentials obtains credentials using secure methods with fallback
+func getSecureCredentials(cmd *cobra.Command) (*unifi.Credentials, error) {
+	manager := unifi.NewCredentialManager(debug)
+
+	// Add credential sources in order of preference
+
+	// 1. Command line flags (if both username and password provided)
+	if username != "" && password != "" {
+		if debug {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Using credentials from command line flags\n")
+		}
+		return unifi.NewCredentials(username, password)
+	}
+
+	// 2. Credential file (if specified)
+	if credentialFile != "" {
+		manager.AddSource(unifi.NewFileCredentialSource(credentialFile))
+	}
+
+	// 3. Environment variables
+	manager.AddSource(unifi.NewEnvironmentCredentialSource("UNIFI_USERNAME", "UNIFI_PASSWORD"))
+
+	// 4. Keychain (if enabled)
+	if useKeychain {
+		account := keychainAccount
+		if account == "" {
+			account = username // Use username from flags if available
+		}
+		if account == "" {
+			return nil, fmt.Errorf("keychain account required when using keychain")
+		}
+		manager.AddSource(unifi.NewKeychainCredentialSource(keychainService, account))
+	}
+
+	// 5. Stdin (if enabled or no other sources available)
+	if useStdin || (!useKeychain && credentialFile == "" && username == "" && password == "") {
+		// Check if we can prompt for credentials
+		if unifi.IsCredentialInputAvailable() || useStdin {
+			manager.AddSource(unifi.NewStdinCredentialSource(cmd.InOrStdin(), cmd.ErrOrStderr(), true))
+		}
+	}
+
+	// Try to get credentials from sources
+	credentials, err := manager.GetCredentials()
+	if err != nil {
+		return nil, fmt.Errorf("unable to obtain credentials: %w\n\nAvailable options:\n"+
+			"  --username and --password flags\n"+
+			"  --credential-file path/to/creds.json\n"+
+			"  --keychain with --keychain-account\n"+
+			"  --stdin to read from stdin\n"+
+			"  UNIFI_USERNAME and UNIFI_PASSWORD environment variables", err)
+	}
+
+	return credentials, nil
 }
