@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/johnweldon/unifi-scheduler/pkg/output"
 )
 
 var listCmd = &cobra.Command{
@@ -15,8 +17,21 @@ var listCmd = &cobra.Command{
 		devices, err := ses.GetDevices()
 		cobra.CheckErr(err)
 
-		for _, device := range devices {
-			cmd.Printf("%s\n", device.String())
+		// Get output options and create formatter
+		opts, err := getOutputOptions(cmd)
+		cobra.CheckErr(err)
+
+		formatter := opts.CreateFormatter()
+
+		// Handle different output formats
+		switch opts.Format {
+		case output.FormatTable:
+			for _, device := range devices {
+				cmd.Printf("%s\n", device.String())
+			}
+		case output.FormatJSON, output.FormatYAML:
+			err = formatter.Write(devices)
+			cobra.CheckErr(err)
 		}
 	},
 }

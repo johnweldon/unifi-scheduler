@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/johnweldon/unifi-scheduler/pkg/output"
 )
 
 var allEvents bool
@@ -22,8 +24,21 @@ var eventListCmd = &cobra.Command{
 		events, err := fetch()
 		cobra.CheckErr(err)
 
-		for _, event := range events {
-			cmd.Printf("%s\n", event.String())
+		// Get output options and create formatter
+		opts, err := getOutputOptions(cmd)
+		cobra.CheckErr(err)
+
+		formatter := opts.CreateFormatter()
+
+		// Handle different output formats
+		switch opts.Format {
+		case output.FormatTable:
+			for _, event := range events {
+				cmd.Printf("%s\n", event.String())
+			}
+		case output.FormatJSON, output.FormatYAML:
+			err = formatter.Write(events)
+			cobra.CheckErr(err)
 		}
 	},
 }

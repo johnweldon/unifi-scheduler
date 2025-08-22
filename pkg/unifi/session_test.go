@@ -121,4 +121,3 @@ func TestSession_Initialize_DefaultsOnlySetOnce(t *testing.T) {
 		t.Error("circuitBreaker should not be recreated on second initialization")
 	}
 }
-

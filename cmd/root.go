@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	lnats "github.com/johnweldon/unifi-scheduler/pkg/nats"
+	"github.com/johnweldon/unifi-scheduler/pkg/output"
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
@@ -21,6 +22,9 @@ var (
 	username string
 	password string
 	endpoint string
+
+	// Output format options
+	outputFormat string
 
 	// Secure credential input options
 	credentialFile  string
@@ -59,6 +63,12 @@ For complete documentation and examples, visit:
 https://github.com/johnweldon/unifi-scheduler`,
 	Example: `  # List all connected clients (secure defaults)
   unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client list
+
+  # Output in JSON format for automation
+  unifi-scheduler --endpoint https://controller --output json client list
+
+  # Output in YAML format
+  unifi-scheduler --endpoint https://controller --output yaml device list
 
   # Connect with custom TLS settings
   unifi-scheduler --endpoint https://controller --tls-min-version 1.3 --keychain --keychain-account admin client list
@@ -102,6 +112,7 @@ func init() { // nolint: gochecknoinits
 
 	pf.StringVar(&cfgFile, "config", "", "config file (default is $HOME/.unifi-scheduler.yaml)")
 	pf.BoolVar(&debug, "debug", debug, "debug output")
+	pf.StringVar(&outputFormat, "output", "table", "output format (table, json, yaml)")
 
 	pf.StringVar(&username, usernameFlag, username, "unifi username (optional if using secure credential input)")
 	pf.StringVar(&password, passwordFlag, password, "unifi password (optional if using secure credential input)")
@@ -375,6 +386,11 @@ func createTLSConfig(cmd *cobra.Command) (*unifi.TLSConfig, error) {
 	}
 
 	return config, nil
+}
+
+// getOutputOptions creates output options from the global output format flag
+func getOutputOptions(cmd *cobra.Command) (*output.OutputOptions, error) {
+	return output.NewOutputOptions(outputFormat, cmd.OutOrStdout())
 }
 
 // parseTLSVersion converts string version to TLS constant

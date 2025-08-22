@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/johnweldon/unifi-scheduler/pkg/output"
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
 
@@ -43,7 +44,20 @@ Output includes:
 		clients, err := fetch()
 		cobra.CheckErr(err)
 
-		display.ClientsTable(cmd.OutOrStdout(), clients).Render()
+		// Get output options and create formatter
+		opts, err := getOutputOptions(cmd)
+		cobra.CheckErr(err)
+
+		formatter := opts.CreateFormatter()
+
+		// Handle different output formats
+		switch opts.Format {
+		case output.FormatTable:
+			display.ClientsTable(cmd.OutOrStdout(), clients).Render()
+		case output.FormatJSON, output.FormatYAML:
+			err = formatter.Write(clients)
+			cobra.CheckErr(err)
+		}
 	},
 }
 

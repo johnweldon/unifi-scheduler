@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/johnweldon/unifi-scheduler/pkg/nats"
+	"github.com/johnweldon/unifi-scheduler/pkg/output"
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 	"github.com/johnweldon/unifi-scheduler/pkg/unifi/display"
 )
@@ -38,8 +39,27 @@ Data freshness depends on the agent polling interval.`,
 		var into []unifi.Client
 		cobra.CheckErr(s.Get(nats.DetailBucket(baseSubject), nats.ActiveKey, &into))
 
-		display.ClientsTable(cmd.OutOrStdout(), into).Render()
-		fmt.Fprintf(cmd.OutOrStdout(), "%70s\n", time.Now().Format(time.RFC1123))
+		// Get output options and create formatter
+		outputOpts, err := getOutputOptions(cmd)
+		cobra.CheckErr(err)
+
+		formatter := outputOpts.CreateFormatter()
+
+		// Handle different output formats
+		switch outputOpts.Format {
+		case output.FormatTable:
+			display.ClientsTable(cmd.OutOrStdout(), into).Render()
+			fmt.Fprintf(cmd.OutOrStdout(), "%70s\n", time.Now().Format(time.RFC1123))
+		case output.FormatJSON, output.FormatYAML:
+			// For structured formats, include timestamp in the data
+			result := map[string]interface{}{
+				"clients":   into,
+				"timestamp": time.Now().Format(time.RFC3339),
+				"count":     len(into),
+			}
+			err = formatter.Write(result)
+			cobra.CheckErr(err)
+		}
 	},
 }
 
