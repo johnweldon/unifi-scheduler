@@ -22,6 +22,7 @@ var (
 	username string
 	password string
 	endpoint string
+	site     string
 
 	// Output format options
 	outputFormat string
@@ -86,7 +87,10 @@ https://github.com/johnweldon/unifi-scheduler`,
   unifi-scheduler tls test --endpoint https://controller
 
   # Use configuration file
-  unifi-scheduler --config ~/.unifi-scheduler.yaml client list`,
+  unifi-scheduler --config ~/.unifi-scheduler.yaml client list
+
+  # Connect to specific site in multi-site controller
+  unifi-scheduler --endpoint https://controller --site branch-office client list`,
 }
 
 var versionCmd = &cobra.Command{
@@ -117,6 +121,7 @@ func init() { // nolint: gochecknoinits
 	pf.StringVar(&username, usernameFlag, username, "unifi username (optional if using secure credential input)")
 	pf.StringVar(&password, passwordFlag, password, "unifi password (optional if using secure credential input)")
 	pf.StringVar(&endpoint, endpointFlag, endpoint, "unifi endpoint")
+	pf.StringVar(&site, "site", "default", "unifi site identifier for multi-site controllers")
 	_ = cobra.MarkFlagRequired(pf, endpointFlag)
 
 	// Secure credential input flags
@@ -256,6 +261,7 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 		unifi.WithHTTPTimeout(httpTimeout),
 		unifi.WithCredentials(credentials),
 		unifi.WithTLSConfig(tlsConfig),
+		unifi.WithSite(site),
 	}
 
 	if debug {

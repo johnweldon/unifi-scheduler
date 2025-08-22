@@ -58,7 +58,7 @@ debug: false
 
 # Site ID for multi-site UniFi controllers
 # Usually 'default' for single-site setups
-# site: "default"
+site: "default"
 
 # Custom CA certificate file for HTTPS verification
 # ca-cert: "/path/to/custom-ca.pem"
@@ -88,6 +88,13 @@ debug: false
 # insecure: true
 # debug: true
 
+# Example 4: Multi-site controller setup
+# endpoint: "https://multi-site-controller.company.com"
+# username: "site-admin"
+# password: "secure-password"
+# site: "branch-office"
+# http-timeout: "2m"
+
 # ============================================================================
 # SECURITY NOTES
 # ============================================================================
@@ -97,6 +104,7 @@ debug: false
 #
 # 2. For production, consider using environment variables instead:
 #    export UNIFI_PASSWORD="secret"
+#    export UNIFI_SITE="branch-office"
 #    unifi-scheduler client list
 #
 # 3. Never commit configuration files with real passwords to version control

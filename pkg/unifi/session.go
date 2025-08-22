@@ -157,6 +157,23 @@ func WithErr(e io.Writer) Option { return func(s *Session) { s.errWriter = e } }
 // Debug output includes HTTP request/response details and internal state information.
 func WithDbg(d io.Writer) Option { return func(s *Session) { s.dbgWriter = d } }
 
+// WithSite configures the site identifier for multi-site UniFi controllers.
+//
+// This option sets the site ID that will be used in API requests. For single-site
+// controllers or when not specified, the session defaults to "default".
+//
+// Common site IDs:
+//   - "default" - Default site for single-site controllers
+//   - Custom site names for multi-site deployments
+//
+// Example:
+//
+//	session.Initialize(
+//	    WithSite("branch-office"),
+//	    WithCredentials(creds),
+//	)
+func WithSite(site string) Option { return func(s *Session) { s.site = site } }
+
 // WithHTTPTimeout configures the timeout for HTTP requests made by the session.
 // This timeout applies to individual HTTP operations, not the overall session lifetime.
 // A reasonable default is 30 seconds for most UniFi controller operations.
