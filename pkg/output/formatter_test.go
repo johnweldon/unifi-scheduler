@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
@@ -116,3 +117,58 @@ func TestNewOutputOptions_InvalidFormat(t *testing.T) {
 	}
 }
 
+func TestFormatter_WriteTable(t *testing.T) {
+	buf := &bytes.Buffer{}
+	formatter := NewFormatter(FormatTable, buf)
+
+	// Test with data that implements TableWriter interface
+	tableData := &mockTableWriter{content: "test table data"}
+	err := formatter.Write(tableData)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	output := buf.String()
+	if output != "test table data\n" {
+		t.Errorf("Expected table output to be 'test table data\\n', got: %q", output)
+	}
+}
+
+func TestFormatter_WriteTable_Fallback(t *testing.T) {
+	buf := &bytes.Buffer{}
+	formatter := NewFormatter(FormatTable, buf)
+
+	// Test with data that doesn't implement TableWriter interface
+	data := "simple string data"
+	err := formatter.Write(data)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	output := buf.String()
+	if output != "simple string data\n" {
+		t.Errorf("Expected fallback output to be 'simple string data\\n', got: %q", output)
+	}
+}
+
+func TestFormatter_WriteUnsupportedFormat(t *testing.T) {
+	buf := &bytes.Buffer{}
+	formatter := &Formatter{format: "unsupported", writer: buf}
+
+	err := formatter.Write("test data")
+	if err == nil {
+		t.Error("Expected error for unsupported format")
+	}
+	if !strings.Contains(err.Error(), "unsupported format") {
+		t.Errorf("Expected error message to contain 'unsupported format', got: %v", err)
+	}
+}
+
+// mockTableWriter implements the TableWriter interface for testing
+type mockTableWriter struct {
+	content string
+}
+
+func (m *mockTableWriter) WriteTable(w io.Writer) {
+	w.Write([]byte(m.content + "\n"))
+}

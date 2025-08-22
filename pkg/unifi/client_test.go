@@ -1,6 +1,7 @@
 package unifi
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -224,4 +225,281 @@ func TestClientOrderedBySorting(t *testing.T) {
 			t.Errorf("After sorting, clients[%d].Name = %q, want %q", i, clients[i].Name, expectedName)
 		}
 	}
+}
+
+func TestClientGlyphs(t *testing.T) {
+	tests := []struct {
+		name    string
+		client  Client
+		blocked rune
+		guest   rune
+		wired   rune
+	}{
+		{
+			name:    "blocked, guest, wired client",
+			client:  Client{IsBlocked: true, IsGuest: true, IsWired: true},
+			blocked: '✗',
+			guest:   '✓',
+			wired:   '⌁',
+		},
+		{
+			name:    "normal wireless client",
+			client:  Client{IsBlocked: false, IsGuest: false, IsWired: false},
+			blocked: ' ',
+			guest:   ' ',
+			wired:   '⌔',
+		},
+		{
+			name:    "authorized wired client",
+			client:  Client{IsBlocked: false, IsGuest: false, IsWired: true},
+			blocked: ' ',
+			guest:   ' ',
+			wired:   '⌁',
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.client.IsBlockedGlyph(); got != tt.blocked {
+				t.Errorf("IsBlockedGlyph() = %q, want %q", got, tt.blocked)
+			}
+			if got := tt.client.IsGuestGlyph(); got != tt.guest {
+				t.Errorf("IsGuestGlyph() = %q, want %q", got, tt.guest)
+			}
+			if got := tt.client.IsWiredGlyph(); got != tt.wired {
+				t.Errorf("IsWiredGlyph() = %q, want %q", got, tt.wired)
+			}
+		})
+	}
+}
+
+func TestClientDisplayIP(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   Client
+		expected string
+	}{
+		{
+			name: "client with fixed IP",
+			client: Client{
+				FixedIP: IP("192.168.1.100"),
+				IP:      IP("192.168.1.50"),
+				MAC:     MAC("aa:bb:cc:dd:ee:ff"),
+			},
+			expected: "192.168.1.100",
+		},
+		{
+			name: "client with IP only",
+			client: Client{
+				FixedIP: IP(""),
+				IP:      IP("192.168.1.50"),
+				MAC:     MAC("aa:bb:cc:dd:ee:ff"),
+			},
+			expected: "192.168.1.50",
+		},
+		{
+			name: "client with MAC only",
+			client: Client{
+				FixedIP: IP(""),
+				IP:      IP(""),
+				MAC:     MAC("aa:bb:cc:dd:ee:ff"),
+			},
+			expected: "aa:bb:cc:dd:ee:ff",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.client.DisplayIP()
+			if result != tt.expected {
+				t.Errorf("DisplayIP() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClientDisplayBytes(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   Client
+		expected string
+	}{
+		{
+			name: "wired client bytes",
+			client: Client{
+				IsWired:            true,
+				WiredBytesReceived: 1024000,
+				WiredBytesSent:     2048000,
+				BytesReceived:      500000,
+				BytesSent:          750000,
+			},
+			expected: "1.0 MB", // Should use wired bytes
+		},
+		{
+			name: "wireless client bytes",
+			client: Client{
+				IsWired:       false,
+				BytesReceived: 1024000,
+				BytesSent:     2048000,
+			},
+			expected: "1.0 MB", // Should use wireless bytes
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			received := tt.client.DisplayReceivedBytes()
+			if !containsNumber(received) {
+				t.Errorf("DisplayReceivedBytes() = %q, expected non-empty", received)
+			}
+
+			sent := tt.client.DisplaySentBytes()
+			if !containsNumber(sent) {
+				t.Errorf("DisplaySentBytes() = %q, expected non-empty", sent)
+			}
+		})
+	}
+}
+
+func TestClientDisplayWiredRate(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   Client
+		expected string
+	}{
+		{
+			name: "100 Mbps wired client",
+			client: Client{
+				IsWired:       true,
+				WiredRateMBPS: 100,
+			},
+			expected: "FE",
+		},
+		{
+			name: "1000 Mbps wired client",
+			client: Client{
+				IsWired:       true,
+				WiredRateMBPS: 1000,
+			},
+			expected: "GbE",
+		},
+		{
+			name: "wireless client",
+			client: Client{
+				IsWired: false,
+			},
+			expected: "",
+		},
+		{
+			name: "wired client with 0 rate",
+			client: Client{
+				IsWired:       true,
+				WiredRateMBPS: 0,
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.client.DisplayWiredRate()
+			if result != tt.expected {
+				t.Errorf("DisplayWiredRate() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClientDisplaySwitchName(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   Client
+		expected string
+	}{
+		{
+			name: "client with upstream name",
+			client: Client{
+				UpstreamName:   "Main-Switch",
+				AccessPointMAC: "aa:bb:cc:dd:ee:ff",
+			},
+			expected: "Main-Switch",
+		},
+		{
+			name: "client without upstream name",
+			client: Client{
+				UpstreamName:   "",
+				AccessPointMAC: "aa:bb:cc:dd:ee:ff",
+				SwitchMAC:      "11:22:33:44:55:66",
+			},
+			expected: "aa:bb:cc:dd:ee:ff", // Should return AccessPointMAC via UpstreamMAC()
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.client.DisplaySwitchName()
+			if result != tt.expected {
+				t.Errorf("DisplaySwitchName() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClientString(t *testing.T) {
+	client := Client{
+		Name:           "TestClient",
+		IP:             IP("192.168.1.100"),
+		IsBlocked:      false,
+		IsGuest:        false,
+		IsWired:        true,
+		BytesReceived:  1024000,
+		BytesSent:      2048000,
+		AccessPointMAC: "aa:bb:cc:dd:ee:ff",
+	}
+
+	result := client.String()
+
+	// Should contain the client name
+	if !stringContains(result, "TestClient") {
+		t.Errorf("String() should contain client name, got: %s", result)
+	}
+
+	// Should contain the IP
+	if !stringContains(result, "192.168.1.100") {
+		t.Errorf("String() should contain IP address, got: %s", result)
+	}
+}
+
+func TestToMACs(t *testing.T) {
+	clients := []Client{
+		{MAC: MAC("aa:bb:cc:dd:ee:01")},
+		{MAC: MAC("aa:bb:cc:dd:ee:02")},
+		{MAC: MAC("aa:bb:cc:dd:ee:03")},
+	}
+
+	macs := ToMACs(clients)
+
+	if len(macs) != 3 {
+		t.Errorf("ToMACs() returned %d MACs, want 3", len(macs))
+	}
+
+	for i, expected := range []string{"aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02", "aa:bb:cc:dd:ee:03"} {
+		if string(macs[i]) != expected {
+			t.Errorf("ToMACs()[%d] = %q, want %q", i, string(macs[i]), expected)
+		}
+	}
+}
+
+// Helper functions for tests
+func containsNumber(s string) bool {
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+func stringContains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }

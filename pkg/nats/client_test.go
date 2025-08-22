@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"log"
 	"testing"
 	"time"
 )
@@ -178,5 +179,75 @@ func TestDefaultConstants(t *testing.T) {
 
 	if DefaultKVReplicas != 3 {
 		t.Errorf("DefaultKVReplicas = %d, want 3", DefaultKVReplicas)
+	}
+}
+
+func TestNewPublisher(t *testing.T) {
+	publisher := NewPublisher(
+		OptNATSUrl("nats://test:4222"),
+		OptStreams("test-stream"),
+		OptBuckets("test-bucket"),
+	)
+
+	if publisher == nil {
+		t.Error("NewPublisher() returned nil")
+	}
+
+	// Verify the publisher has the expected configuration
+	if publisher.connURL != "nats://test:4222" {
+		t.Errorf("Publisher connURL = %q, want %q", publisher.connURL, "nats://test:4222")
+	}
+
+	if len(publisher.streams) != 1 || publisher.streams[0] != "test-stream" {
+		t.Errorf("Publisher streams = %v, want [test-stream]", publisher.streams)
+	}
+
+	if len(publisher.buckets) != 1 || publisher.buckets[0] != "test-bucket" {
+		t.Errorf("Publisher buckets = %v, want [test-bucket]", publisher.buckets)
+	}
+}
+
+func TestNewSubscriber(t *testing.T) {
+	subscriber := NewSubscriber(
+		OptNATSUrl("nats://test:4222"),
+		OptBuckets("test-bucket"),
+	)
+
+	if subscriber == nil {
+		t.Error("NewSubscriber() returned nil")
+	}
+
+	// Verify the subscriber has the expected configuration
+	if subscriber.connURL != "nats://test:4222" {
+		t.Errorf("Subscriber connURL = %q, want %q", subscriber.connURL, "nats://test:4222")
+	}
+
+	if len(subscriber.buckets) != 1 || subscriber.buckets[0] != "test-bucket" {
+		t.Errorf("Subscriber buckets = %v, want [test-bucket]", subscriber.buckets)
+	}
+}
+
+func TestLoggerStructure(t *testing.T) {
+	// Test that Logger structure has expected fields
+	logger := &Logger{
+		LogFlags:       log.LstdFlags,
+		LogPrefix:      "test: ",
+		PublishSubject: "test.logs",
+	}
+
+	if logger.LogFlags != log.LstdFlags {
+		t.Errorf("Logger.LogFlags = %d, want %d", logger.LogFlags, log.LstdFlags)
+	}
+	if logger.LogPrefix != "test: " {
+		t.Errorf("Logger.LogPrefix = %q, want %q", logger.LogPrefix, "test: ")
+	}
+	if logger.PublishSubject != "test.logs" {
+		t.Errorf("Logger.PublishSubject = %q, want %q", logger.PublishSubject, "test.logs")
+	}
+
+	// Test that NewStdLogger creates a logger
+	stdLogger := NewStdLogger(logger)
+	if stdLogger == nil {
+		t.Error("NewStdLogger() returned nil")
 	}
 }
