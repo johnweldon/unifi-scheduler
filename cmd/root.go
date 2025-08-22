@@ -128,8 +128,8 @@ func init() { // nolint: gochecknoinits
 	pf.DurationVar(&httpTimeout, "http-timeout", 2*time.Minute, "HTTP request timeout")
 	pf.DurationVar(&natsConnTimeout, "nats-conn-timeout", 15*time.Second, "NATS connection timeout")
 	pf.DurationVar(&natsOpTimeout, "nats-op-timeout", 30*time.Second, "NATS operation timeout")
-	pf.IntVar(&streamReplicas, "stream-replicas", 3, "NATS stream replica count")
-	pf.IntVar(&kvReplicas, "kv-replicas", 3, "NATS key-value replica count")
+	pf.IntVar(&streamReplicas, "stream-replicas", 1, "NATS stream replica count")
+	pf.IntVar(&kvReplicas, "kv-replicas", 1, "NATS key-value replica count")
 
 	rootCmd.AddCommand(versionCmd)
 }

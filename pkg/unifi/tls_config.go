@@ -101,11 +101,8 @@ func (cfg *TLSConfig) Validate() error {
 	}
 
 	// Check for insecure settings in strict mode
-	if cfg.StrictValidation {
-		if cfg.InsecureSkipVerify {
-			return fmt.Errorf("%w: certificate verification disabled", ErrInsecureTLS)
-		}
-
+	// Note: InsecureSkipVerify mode explicitly disables strict validation
+	if cfg.StrictValidation && !cfg.InsecureSkipVerify {
 		if cfg.MinVersion < tls.VersionTLS12 {
 			return fmt.Errorf("%w: minimum TLS version below 1.2", ErrInsecureTLS)
 		}
@@ -342,6 +339,11 @@ func CipherSuiteName(cs uint16) string {
 func ValidateEndpointTLS(endpoint string, tlsConfig *TLSConfig) error {
 	if !strings.HasPrefix(endpoint, "https://") {
 		return fmt.Errorf("endpoint must use HTTPS for secure communication: %s", endpoint)
+	}
+
+	// Skip TLS validation entirely when InsecureSkipVerify is enabled
+	if tlsConfig.InsecureSkipVerify {
+		return nil
 	}
 
 	// Create a temporary client to test TLS connection

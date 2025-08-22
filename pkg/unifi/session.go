@@ -45,6 +45,9 @@ type Session struct {
 	pathValidator  PathValidator
 	tlsConfig      *TLSConfig
 	backoffRetry   *BackoffRetry
+
+	// Internal flag to track initialization state
+	initialized bool
 }
 
 // Option describes an option parameter.
@@ -124,19 +127,40 @@ func WithSecureAuth(username, password string) Option {
 }
 
 // Initialize prepares the session for use.
+// This method is idempotent - calling it multiple times will not override
+// existing configuration, but will apply any new options provided.
 func (s *Session) Initialize(options ...Option) error {
 	if s == nil {
 		return ErrNilSession
 	}
 
-	s.outWriter = os.Stdout
-	s.errWriter = os.Stderr
-	s.httpTimeout = 2 * time.Minute // Default timeout
-	s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
-	s.pathValidator = NewDefaultPathValidator()
-	s.tlsConfig = DefaultTLSConfig()
-	s.backoffRetry = NewBackoffRetry(UniFiRetryConfig())
+	// Only set defaults if this is the first initialization
+	if !s.initialized {
+		if s.outWriter == nil {
+			s.outWriter = os.Stdout
+		}
+		if s.errWriter == nil {
+			s.errWriter = os.Stderr
+		}
+		if s.httpTimeout == 0 {
+			s.httpTimeout = 2 * time.Minute // Default timeout
+		}
+		if s.circuitBreaker == nil {
+			s.circuitBreaker = NewCircuitBreaker(DefaultCircuitBreakerConfig())
+		}
+		if s.pathValidator == nil {
+			s.pathValidator = NewDefaultPathValidator()
+		}
+		if s.tlsConfig == nil {
+			s.tlsConfig = DefaultTLSConfig()
+		}
+		if s.backoffRetry == nil {
+			s.backoffRetry = NewBackoffRetry(UniFiRetryConfig())
+		}
+		s.initialized = true
+	}
 
+	// Always apply new options (allows reconfiguration)
 	for _, option := range options {
 		option(s)
 	}
@@ -172,30 +196,35 @@ func (s *Session) Initialize(options ...Option) error {
 		s.setError(fmt.Errorf("endpoint TLS validation failed: %w", err))
 	}
 
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		s.setError(err)
+	// Create or update HTTP client if needed
+	if s.client == nil {
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			s.setError(err)
+		}
+
+		// Create secure transport
+		secureTransport, err := s.tlsConfig.CreateSecureTransport()
+		if err != nil {
+			s.setError(fmt.Errorf("creating secure transport: %w", err))
+		}
+
+		// Wrap with logging if debug is enabled
+		var finalTransport http.RoundTripper = secureTransport
+		if s.dbgWriter != nil {
+			finalTransport = transport.NewLoggingTransport(secureTransport, transport.LoggingOutput(s.dbgWriter))
+		}
+
+		s.client = &http.Client{ // nolint:exhaustivestruct
+			Jar:       jar,
+			Timeout:   s.httpTimeout,
+			Transport: finalTransport,
+		}
 	}
 
-	// Create secure transport
-	secureTransport, err := s.tlsConfig.CreateSecureTransport()
-	if err != nil {
-		s.setError(fmt.Errorf("creating secure transport: %w", err))
+	if s.login == nil {
+		s.login = s.webLogin
 	}
-
-	// Wrap with logging if debug is enabled
-	var finalTransport http.RoundTripper = secureTransport
-	if s.dbgWriter != nil {
-		finalTransport = transport.NewLoggingTransport(secureTransport, transport.LoggingOutput(s.dbgWriter))
-	}
-
-	s.client = &http.Client{ // nolint:exhaustivestruct
-		Jar:       jar,
-		Timeout:   s.httpTimeout,
-		Transport: finalTransport,
-	}
-
-	s.login = s.webLogin
 
 	return s.err
 }

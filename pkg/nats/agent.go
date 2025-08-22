@@ -64,7 +64,7 @@ func (a *Agent) Start(ctx context.Context) error {
 func (a *Agent) healthCheck(ctx context.Context) error {
 	log.Printf("performing health checks...")
 
-	// Test UniFi connection
+	// Test UniFi connection - Initialize is now idempotent and won't override existing config
 	if err := a.client.Initialize(); err != nil {
 		return fmt.Errorf("unifi initialization failed: %w", err)
 	}
