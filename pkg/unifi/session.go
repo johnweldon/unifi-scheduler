@@ -1,3 +1,43 @@
+// Package unifi provides a comprehensive client library for interacting with UniFi Network controllers.
+//
+// This package implements a session-based client that handles authentication, network operations,
+// and data retrieval from UniFi controllers. It supports secure credential management, TLS
+// configuration, circuit breaker patterns, and retry logic for robust network communication.
+//
+// Key features:
+//   - Session-based authentication with automatic login
+//   - Secure credential management with multiple input methods
+//   - Comprehensive TLS configuration including mutual TLS
+//   - Circuit breaker pattern for resilient network operations
+//   - Exponential backoff retry logic
+//   - Client, device, and event management
+//   - Support for both active and historical data
+//
+// Basic usage:
+//
+//	// Create and initialize a session
+//	session := &unifi.Session{
+//	    Endpoint: "https://controller.example.com",
+//	}
+//
+//	creds, err := unifi.NewCredentials("admin", "password")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	err = session.Initialize(
+//	    unifi.WithCredentials(creds),
+//	    unifi.WithTLSConfig(unifi.DefaultTLSConfig()),
+//	)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	// Get connected clients
+//	clients, err := session.GetClients()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 package unifi
 
 import (
@@ -19,81 +59,189 @@ import (
 	"github.com/jw4/x/transport"
 )
 
-// Session wraps metadata to manage session state.
+// Session represents a persistent connection to a UniFi Network controller.
+//
+// A Session manages the authentication state, HTTP client configuration, and
+// operational parameters for communicating with a UniFi controller. It provides
+// a high-level interface for performing network operations while handling
+// authentication, retries, and error recovery automatically.
+//
+// The Session is designed to be long-lived and reusable across multiple operations.
+// It maintains cookies for authentication, handles CSRF tokens, and provides
+// circuit breaker functionality for resilient network communication.
+//
+// Key responsibilities:
+//   - Authentication and session management
+//   - HTTP client configuration with TLS support
+//   - Request/response handling with retries
+//   - Error handling and recovery
+//   - Output and logging management
+//
+// Example:
+//
+//	session := &unifi.Session{
+//	    Endpoint: "https://controller.example.com",
+//	}
+//
+//	err := session.Initialize(
+//	    unifi.WithCredentials(creds),
+//	    unifi.WithHTTPTimeout(30*time.Second),
+//	)
 type Session struct {
+	// Endpoint is the base URL of the UniFi controller (e.g., "https://controller.example.com")
 	Endpoint string
-	Username string
-	Password string // Deprecated: Use Credentials instead
 
-	// Secure credential storage
+	// Username for authentication (deprecated: use Credentials instead)
+	// Deprecated: Use the Credentials field for secure credential management
+	Username string
+
+	// Password for authentication (deprecated: use Credentials instead)
+	// Deprecated: Use the Credentials field for secure credential management
+	Password string
+
+	// Credentials provides secure storage and management of authentication data
 	Credentials *Credentials
 
-	csrf   string
-	client *http.Client
-	login  func() (string, error)
-	err    error
+	// Internal session state
+	csrf   string                 // CSRF token for request authentication
+	client *http.Client           // HTTP client for controller communication
+	login  func() (string, error) // Login function for authentication
+	err    error                  // Last error encountered during operations
 
-	nonUDMPro bool
-	site      string
+	// Controller configuration
+	nonUDMPro bool   // Flag indicating non-UDM Pro controller type
+	site      string // Site identifier for multi-site controllers
 
-	outWriter io.Writer
-	errWriter io.Writer
-	dbgWriter io.Writer
+	// Output and logging configuration
+	outWriter io.Writer // Writer for standard output
+	errWriter io.Writer // Writer for error output
+	dbgWriter io.Writer // Writer for debug output
 
-	httpTimeout    time.Duration
-	circuitBreaker *CircuitBreaker
-	pathValidator  PathValidator
-	tlsConfig      *TLSConfig
-	backoffRetry   *BackoffRetry
+	// Network and reliability configuration
+	httpTimeout    time.Duration   // Timeout for HTTP requests
+	circuitBreaker *CircuitBreaker // Circuit breaker for resilient operations
+	pathValidator  PathValidator   // Validator for API endpoint paths
+	tlsConfig      *TLSConfig      // TLS configuration for secure connections
+	backoffRetry   *BackoffRetry   // Retry logic with exponential backoff
 
-	// Internal flag to track initialization state
-	initialized bool
+	// Internal state management
+	initialized bool // Flag to track whether the session has been initialized
 }
 
-// Option describes an option parameter.
+// Option represents a configuration function for customizing Session behavior.
+//
+// Options follow the functional options pattern, allowing callers to configure
+// specific aspects of a Session during initialization. This provides a clean,
+// extensible API for session configuration without requiring large constructor
+// parameter lists.
+//
+// Example usage:
+//
+//	session.Initialize(
+//	    WithCredentials(creds),
+//	    WithHTTPTimeout(30*time.Second),
+//	    WithTLSConfig(tlsConfig),
+//	)
 type Option func(*Session)
 
-func WithOut(o io.Writer) Option             { return func(s *Session) { s.outWriter = o } }
-func WithErr(e io.Writer) Option             { return func(s *Session) { s.errWriter = e } }
-func WithDbg(d io.Writer) Option             { return func(s *Session) { s.dbgWriter = d } }
+// WithOut configures the standard output writer for the session.
+// This writer will receive normal operational output from the session.
+func WithOut(o io.Writer) Option { return func(s *Session) { s.outWriter = o } }
+
+// WithErr configures the error output writer for the session.
+// This writer will receive error messages and warnings from the session.
+func WithErr(e io.Writer) Option { return func(s *Session) { s.errWriter = e } }
+
+// WithDbg configures the debug output writer for the session.
+// This writer will receive detailed debugging information when debug mode is enabled.
+// Debug output includes HTTP request/response details and internal state information.
+func WithDbg(d io.Writer) Option { return func(s *Session) { s.dbgWriter = d } }
+
+// WithHTTPTimeout configures the timeout for HTTP requests made by the session.
+// This timeout applies to individual HTTP operations, not the overall session lifetime.
+// A reasonable default is 30 seconds for most UniFi controller operations.
 func WithHTTPTimeout(t time.Duration) Option { return func(s *Session) { s.httpTimeout = t } }
 
-// WithCircuitBreakerConfig sets the circuit breaker configuration
+// WithCircuitBreakerConfig configures the circuit breaker for resilient network operations.
+//
+// The circuit breaker helps protect against cascading failures by temporarily
+// failing fast when the UniFi controller is experiencing issues. It automatically
+// reopens when the controller becomes healthy again.
+//
+// Parameters:
+//   - config: Circuit breaker configuration including failure thresholds and timeouts
 func WithCircuitBreakerConfig(config CircuitBreakerConfig) Option {
 	return func(s *Session) {
 		s.circuitBreaker = NewCircuitBreaker(config)
 	}
 }
 
-// WithBackoffConfig sets the backoff retry configuration
+// WithBackoffConfig configures the exponential backoff retry logic for failed operations.
+//
+// The backoff retry mechanism automatically retries failed operations with
+// increasing delays between attempts. This helps handle temporary network
+// issues and controller overload gracefully.
+//
+// Parameters:
+//   - config: Backoff configuration including max retries, initial delay, and backoff multiplier
 func WithBackoffConfig(config BackoffConfig) Option {
 	return func(s *Session) {
 		s.backoffRetry = NewBackoffRetry(config)
 	}
 }
 
-// WithPathValidator sets a custom path validator
+// WithPathValidator configures a custom validator for API endpoint paths.
+//
+// The path validator provides security by validating that API requests only
+// access authorized endpoints. This helps prevent path traversal attacks
+// and ensures requests stay within the expected API boundaries.
+//
+// Parameters:
+//   - validator: Path validator implementation to use for endpoint validation
 func WithPathValidator(validator PathValidator) Option {
 	return func(s *Session) {
 		s.pathValidator = validator
 	}
 }
 
-// WithTLSConfig sets custom TLS configuration
+// WithTLSConfig configures custom TLS settings for secure controller communication.
+//
+// This option allows fine-grained control over TLS behavior, including:
+//   - Certificate verification settings
+//   - Minimum and maximum TLS versions
+//   - Custom root CA certificates
+//   - Client certificate authentication (mutual TLS)
+//   - Cipher suite selection
+//
+// Parameters:
+//   - config: TLS configuration specifying security requirements and certificates
 func WithTLSConfig(config *TLSConfig) Option {
 	return func(s *Session) {
 		s.tlsConfig = config
 	}
 }
 
-// WithInsecureTLS allows insecure TLS (for development only)
+// WithInsecureTLS disables TLS certificate verification (for development only).
+//
+// WARNING: This option disables certificate verification and should NEVER be used
+// in production environments. It makes the connection vulnerable to man-in-the-middle
+// attacks. Only use this for development or testing with self-signed certificates.
+//
+// For production use with self-signed certificates, use WithTLSConfig with a
+// custom root CA instead.
 func WithInsecureTLS() Option {
 	return func(s *Session) {
 		s.tlsConfig = InsecureTLSConfig()
 	}
 }
 
-// CircuitBreakerStats returns the current circuit breaker statistics
+// CircuitBreakerStats returns the current statistics for the session's circuit breaker.
+//
+// Circuit breaker statistics provide insight into the reliability of controller
+// communication, including failure rates, current state, and timing information.
+// This is useful for monitoring and debugging network reliability issues.
+//
+// Returns default statistics if no circuit breaker is configured.
 func (s *Session) CircuitBreakerStats() CircuitBreakerStats {
 	if s.circuitBreaker == nil {
 		return CircuitBreakerStats{State: CircuitBreakerClosed}
@@ -101,7 +249,13 @@ func (s *Session) CircuitBreakerStats() CircuitBreakerStats {
 	return s.circuitBreaker.Stats()
 }
 
-// BackoffStats returns the current backoff retry statistics
+// BackoffStats returns the current statistics for the session's retry backoff mechanism.
+//
+// Backoff statistics provide information about retry attempts, success rates,
+// and timing patterns. This is valuable for understanding how often operations
+// need to be retried and tuning backoff parameters.
+//
+// Returns default statistics if no backoff retry is configured.
 func (s *Session) BackoffStats() BackoffStats {
 	if s.backoffRetry == nil {
 		return BackoffStats{Strategy: BackoffExponential}
@@ -109,12 +263,30 @@ func (s *Session) BackoffStats() BackoffStats {
 	return s.backoffRetry.Stats()
 }
 
-// WithCredentials sets secure credentials for the session
+// WithCredentials configures secure credential storage for session authentication.
+//
+// This is the recommended way to provide authentication credentials to a session.
+// The Credentials type provides secure storage and automatic memory clearing
+// to protect sensitive authentication data.
+//
+// Parameters:
+//   - creds: Secure credentials object containing username and password
 func WithCredentials(creds *Credentials) Option {
 	return func(s *Session) { s.Credentials = creds }
 }
 
-// WithSecureAuth creates secure credentials from username/password
+// WithSecureAuth creates secure credentials from a username and password.
+//
+// This is a convenience function that creates a Credentials object from
+// plain text username and password. The credentials are automatically
+// secured in memory and will be cleared when no longer needed.
+//
+// Parameters:
+//   - username: UniFi controller username
+//   - password: UniFi controller password
+//
+// Note: If credential creation fails, the session will have an error set
+// that will be returned during initialization.
 func WithSecureAuth(username, password string) Option {
 	return func(s *Session) {
 		creds, err := NewCredentials(username, password)
@@ -126,9 +298,45 @@ func WithSecureAuth(username, password string) Option {
 	}
 }
 
-// Initialize prepares the session for use.
-// This method is idempotent - calling it multiple times will not override
-// existing configuration, but will apply any new options provided.
+// Initialize prepares the session for communication with the UniFi controller.
+//
+// This method configures the session with default values, applies the provided
+// options, validates the configuration, and sets up the HTTP client for secure
+// communication. It must be called before any other session operations.
+//
+// The method is idempotent - calling it multiple times will not override existing
+// configuration, but will apply any new options provided. This allows safe
+// reconfiguration and use in health check scenarios.
+//
+// Initialization process:
+//  1. Sets default values for unconfigured fields (first call only)
+//  2. Applies all provided configuration options
+//  3. Validates credentials and endpoint configuration
+//  4. Performs TLS endpoint validation
+//  5. Creates and configures the HTTP client
+//  6. Sets up authentication mechanisms
+//
+// Parameters:
+//   - options: Zero or more Option functions to configure the session
+//
+// Returns an error if:
+//   - The session is nil
+//   - Required configuration is missing (endpoint, credentials)
+//   - TLS configuration is invalid
+//   - HTTP client creation fails
+//   - Endpoint TLS validation fails
+//
+// Example:
+//
+//	session := &unifi.Session{Endpoint: "https://controller.example.com"}
+//	err := session.Initialize(
+//	    unifi.WithCredentials(creds),
+//	    unifi.WithHTTPTimeout(30*time.Second),
+//	    unifi.WithTLSConfig(tlsConfig),
+//	)
+//	if err != nil {
+//	    log.Fatalf("Failed to initialize session: %v", err)
+//	}
 func (s *Session) Initialize(options ...Option) error {
 	if s == nil {
 		return ErrNilSession
@@ -229,8 +437,33 @@ func (s *Session) Initialize(options ...Option) error {
 	return s.err
 }
 
-// Login performs authentication with the UniFi server, and stores the
-// http credentials.
+// Login performs authentication with the UniFi controller and establishes a session.
+//
+// This method authenticates with the controller using the configured credentials
+// and stores the necessary authentication tokens (cookies, CSRF tokens) for
+// subsequent API requests. The session must be initialized before calling Login.
+//
+// The authentication process includes:
+//   - Sending credentials to the controller's login endpoint
+//   - Storing authentication cookies for session persistence
+//   - Retrieving and storing CSRF tokens for API security
+//   - Validating the authentication response
+//
+// Returns:
+//   - string: Success message from the controller (usually empty for successful logins)
+//   - error: Authentication error if login fails
+//
+// Common errors:
+//   - ErrUninitializedSession: Session not initialized before login attempt
+//   - Network errors: Connection issues with the controller
+//   - Authentication errors: Invalid credentials or controller issues
+//
+// Example:
+//
+//	msg, err := session.Login()
+//	if err != nil {
+//	    log.Fatalf("Authentication failed: %v", err)
+//	}
 func (s *Session) Login() (string, error) {
 	if s.login == nil {
 		s.login = func() (string, error) {
@@ -241,7 +474,36 @@ func (s *Session) Login() (string, error) {
 	return s.login()
 }
 
-// GetDevices looks up and returns known Devices.
+// GetDevices retrieves all network devices managed by the UniFi controller.
+//
+// This method fetches information about all UniFi devices (access points, switches,
+// gateways, etc.) connected to the controller. The devices are automatically sorted
+// using the default device sorting criteria.
+//
+// Device information includes:
+//   - Device identification (name, model, MAC address)
+//   - Status and health information
+//   - Network configuration and statistics
+//   - Firmware version and adoption status
+//   - Performance metrics and uptime
+//
+// Returns:
+//   - []Device: Slice of device objects with complete device information
+//   - error: Error if device retrieval fails
+//
+// The returned devices are sorted by the default criteria (typically by name).
+// Use the Device.Sort methods for custom sorting if needed.
+//
+// Example:
+//
+//	devices, err := session.GetDevices()
+//	if err != nil {
+//	    log.Fatalf("Failed to get devices: %v", err)
+//	}
+//
+//	for _, device := range devices {
+//	    fmt.Printf("Device: %s (%s)\n", device.Name, device.Model)
+//	}
 func (s *Session) GetDevices() ([]Device, error) {
 	var (
 		devices []Device
@@ -263,12 +525,78 @@ func (s *Session) GetDevices() ([]Device, error) {
 	return devices, nil
 }
 
-// GetClients returns a list of connected Clients.
+// GetClients retrieves currently connected network clients from the UniFi controller.
+//
+// This method fetches information about active clients currently connected to the
+// network. It returns only clients that are currently online and associated with
+// access points or switches managed by the controller.
+//
+// Client information includes:
+//   - Device identification (hostname, MAC address, device name)
+//   - Network information (IP address, connection type, speed)
+//   - Connection statistics (data usage, connection time)
+//   - Device classification and vendor information
+//   - Quality metrics (signal strength for wireless clients)
+//
+// Parameters:
+//   - filters: Optional ClientFilter functions to filter the results
+//
+// Returns:
+//   - []Client: Slice of active client objects
+//   - error: Error if client retrieval fails
+//
+// Example:
+//
+//	clients, err := session.GetClients()
+//	if err != nil {
+//	    log.Fatalf("Failed to get clients: %v", err)
+//	}
+//
+//	fmt.Printf("Found %d active clients\n", len(clients))
+//	for _, client := range clients {
+//	    fmt.Printf("Client: %s at %s\n", client.Hostname, client.IP)
+//	}
 func (s *Session) GetClients(filters ...ClientFilter) ([]Client, error) {
 	return s.getClients(false, filters...)
 }
 
-// GetAllClients returns all known Clients.
+// GetAllClients retrieves all known network clients from the UniFi controller.
+//
+// This method fetches information about all clients that the controller has ever
+// seen, including both currently connected clients and historical/offline clients.
+// This provides a complete view of all devices that have connected to the network.
+//
+// The returned data includes the same information as GetClients, but covers:
+//   - Currently connected clients
+//   - Recently disconnected clients
+//   - Historical client records
+//   - Blocked or restricted clients
+//
+// Parameters:
+//   - filters: Optional ClientFilter functions to filter the results
+//
+// Returns:
+//   - []Client: Slice of all known client objects
+//   - error: Error if client retrieval fails
+//
+// Note: This method may return a large dataset on busy networks with many
+// historical client connections. Consider using GetClients for real-time
+// monitoring or apply filters to limit the results.
+//
+// Example:
+//
+//	allClients, err := session.GetAllClients()
+//	if err != nil {
+//	    log.Fatalf("Failed to get all clients: %v", err)
+//	}
+//
+//	active := 0
+//	for _, client := range allClients {
+//	    if client.IsConnected() {
+//	        active++
+//	    }
+//	}
+//	fmt.Printf("Total clients: %d, Active: %d\n", len(allClients), active)
 func (s *Session) GetAllClients(filters ...ClientFilter) ([]Client, error) {
 	return s.getClients(true, filters...)
 }

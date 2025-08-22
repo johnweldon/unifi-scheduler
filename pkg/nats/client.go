@@ -1,3 +1,38 @@
+// Package nats provides NATS JetStream integration for the unifi-scheduler.
+//
+// This package implements a distributed caching and messaging system using NATS JetStream
+// to store and distribute UniFi controller data across multiple instances of the scheduler.
+// It supports both publish/subscribe messaging and key-value storage for efficient data
+// sharing and real-time updates.
+//
+// Key components:
+//   - Client: Core NATS connection and JetStream management
+//   - Publisher: High-level interface for publishing data and events
+//   - Subscriber: High-level interface for consuming cached data
+//   - Agent: Long-running service that populates the cache from UniFi controllers
+//
+// The package provides automatic connection management, stream creation, and key-value
+// bucket setup with configurable replication and retention policies.
+//
+// Basic usage:
+//
+//	// Create a publisher for caching data
+//	publisher := nats.NewPublisher(
+//	    nats.OptNATSUrl("nats://server:4222"),
+//	    nats.OptStreamReplicas(3),
+//	)
+//
+//	// Store client data in the cache
+//	err := publisher.Store("clients", "active", clientList)
+//
+//	// Create a subscriber for reading cached data
+//	subscriber := nats.NewSubscriber(
+//	    nats.OptNATSUrl("nats://server:4222"),
+//	)
+//
+//	// Retrieve cached client data
+//	var clients []unifi.Client
+//	err = subscriber.Get("clients", "active", &clients)
 package nats
 
 import (
@@ -11,20 +46,50 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
+// Default configuration values for NATS operations.
+// These provide reasonable defaults for most UniFi controller scenarios.
 var (
-	DefaultConnectTimeout   = 15 * time.Second
-	DefaultWriteTimeout     = 30 * time.Second
+	// DefaultConnectTimeout is the default timeout for establishing NATS connections
+	DefaultConnectTimeout = 15 * time.Second
+
+	// DefaultWriteTimeout is the default timeout for write operations to NATS
+	DefaultWriteTimeout = 30 * time.Second
+
+	// DefaultOperationTimeout is the default timeout for general NATS operations
 	DefaultOperationTimeout = 30 * time.Second
-	DefaultStreamReplicas   = 3
-	DefaultKVReplicas       = 3
+
+	// DefaultStreamReplicas is the default replication factor for JetStream streams
+	DefaultStreamReplicas = 3
+
+	// DefaultKVReplicas is the default replication factor for key-value buckets
+	DefaultKVReplicas = 3
 )
 
+// ClientOpt represents a configuration option for NATS clients.
+//
+// Options follow the functional options pattern, allowing flexible configuration
+// of NATS clients without requiring large constructor parameter lists.
 type ClientOpt func(*Client)
 
+// OptNATSUrl configures the NATS server URL for client connections.
+//
+// The URL should include the protocol and port (e.g., "nats://server:4222").
+// For TLS connections, use "tls://server:4222". For WebSocket connections,
+// use "ws://server:8080" or "wss://server:443".
 func OptNATSUrl(u string) ClientOpt { return func(c *Client) { c.connURL = u } }
 
+// OptCreds configures the path to a NATS credentials file for authentication.
+//
+// The credentials file should contain the JWT and NKey for authenticating
+// with a secured NATS server. This is the recommended authentication method
+// for production deployments.
 func OptCreds(credsFilePath string) ClientOpt { return func(c *Client) { c.credsFile = credsFilePath } }
 
+// OptStreams configures the JetStream streams that the client will manage.
+//
+// Streams are used for persistent messaging and event distribution. The client
+// will automatically create these streams if they don't exist, with appropriate
+// configuration for UniFi controller data.
 func OptStreams(names ...string) ClientOpt {
 	return func(c *Client) { c.streams = append(c.streams, names...) }
 }
