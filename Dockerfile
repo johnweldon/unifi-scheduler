@@ -2,6 +2,8 @@ FROM golang AS certs
 
 FROM scratch
 
+ARG TARGETPLATFORM
+
 LABEL \
   maintainer="John Weldon <john@tempusbreve.com>" \
   company="Tempus Breve Software" \
@@ -9,7 +11,7 @@ LABEL \
 
 COPY --from=certs /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY unifi-scheduler unifi-scheduler
+COPY ${TARGETPLATFORM}/unifi-scheduler /unifi-scheduler
 
 ENV \
   TZ="America/Phoenix" \

@@ -5,51 +5,35 @@ version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
     - go generate ./...
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
 
 builds:
   - env:
       - CGO_ENABLED=0
     targets:
       - go_first_class
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
-dockers:
-  - image_templates:
-      - &amd64_image "{{ .Env.IMAGE_ROOT }}:{{ .Version }}-amd64"
-    goos: linux
-    goarch: amd64
+dockers_v2:
+  - images:
+      - "{{ .Env.IMAGE_ROOT }}"
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
     dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - --platform=linux/amd64
-      - --provenance=false
-  - image_templates:
-      - &arm64_image "{{ .Env.IMAGE_ROOT }}:{{ .Version }}-arm64"
-    goos: linux
-    goarch: arm64
-    goarm: 8
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - --platform=linux/arm64
-      - --provenance=false
-
-docker_manifests:
-  - name_template: "{{ .Env.IMAGE_ROOT }}:{{ .Version }}"
-    image_templates:
-      - *amd64_image
-      - *arm64_image
-  - name_template: "{{ .Env.IMAGE_ROOT }}:latest"
-    image_templates:
-      - *amd64_image
-      - *arm64_image
 
 archives:
-  - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -57,17 +41,44 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+source:
+  enabled: true
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Others
+      order: 999
 
 release:
   disable: true
