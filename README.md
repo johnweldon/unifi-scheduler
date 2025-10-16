@@ -42,14 +42,17 @@ go install github.com/johnweldon/unifi-scheduler@latest
 ### Basic Usage
 
 ```bash
-# List all connected clients
-unifi-scheduler --endpoint https://your-controller --username admin --password yourpass client list
+# First, create secure credentials (recommended)
+unifi-scheduler credential create --file ~/.unifi-creds.json
+
+# List all connected clients (using credential file)
+unifi-scheduler --endpoint https://your-controller --credential-file ~/.unifi-creds.json client list
 
 # Block a client by name or MAC
-unifi-scheduler --endpoint https://controller --username admin --password pass client block "Problem Device"
+unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client block "Problem Device"
 
 # Monitor network events
-unifi-scheduler --endpoint https://controller --username admin --password pass event list
+unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json event list
 
 # View all available commands
 unifi-scheduler --help
@@ -110,6 +113,32 @@ unifi-scheduler client list
 
 ## Command Reference
 
+### Credential Management
+
+```bash
+# Create a secure credential file (interactive)
+unifi-scheduler credential create --file ~/.unifi-creds.json
+
+# Store credentials in system keychain (macOS/Linux)
+unifi-scheduler credential store-keychain --service unifi-prod --account admin
+
+# Test credential retrieval
+unifi-scheduler credential test --credential-file ~/.unifi-creds.json
+```
+
+### TLS Configuration
+
+```bash
+# Test TLS connection to controller
+unifi-scheduler tls test --endpoint https://controller.local
+
+# Show current TLS configuration
+unifi-scheduler tls config --endpoint https://controller.local
+
+# Test with custom TLS settings
+unifi-scheduler tls test --endpoint https://controller.local --tls-min-version 1.3
+```
+
 ### Client Management
 
 ```bash
@@ -141,6 +170,9 @@ unifi-scheduler client lookup "iPhone"
 ```bash
 # List all devices
 unifi-scheduler device list
+
+# Display IPv6 delegated prefix from gateway
+unifi-scheduler device ipv6-prefix
 ```
 
 ### Event Monitoring
@@ -179,30 +211,86 @@ unifi-scheduler --nats_url nats://server:4222 nats connections
 
 # Run NATS caching agent (long-running service)
 unifi-scheduler --nats_url nats://server:4222 nats agent
+
+# Check IPv6 prefix and publish changes to NATS
+unifi-scheduler --nats_url nats://server:4222 nats prefix-check
+```
+
+### Multi-Site Controllers
+
+```bash
+# Connect to specific site in multi-site controller
+unifi-scheduler --endpoint https://controller --site branch-office client list
+
+# Default site is "default"
+unifi-scheduler --endpoint https://controller --site default client list
+```
+
+### Output Formats
+
+```bash
+# Table format (default, human-readable)
+unifi-scheduler --output table client list
+
+# JSON format (for automation and parsing)
+unifi-scheduler --output json client list
+
+# YAML format (for configuration management)
+unifi-scheduler --output yaml device list
+```
+
+### Version Information
+
+```bash
+# Display version information
+unifi-scheduler version
 ```
 
 ## Security Features
 
 ### Credential Protection
 
-UniFi Scheduler includes built-in security features:
+UniFi Scheduler includes multiple secure credential methods:
 
-- **Secure credential storage** with memory obfuscation
+- **JSON credential files** with secure file permissions
+- **System keychain integration** (macOS/Linux)
+- **Stdin credential input** for interactive use
+- **Environment variables** for containerized deployments
 - **Automatic secret scrubbing** in logs and debug output
+- **Memory obfuscation** of sensitive data
 - **Credential validation** with size limits
-- **Memory clearing** of sensitive data
 
-### Environment Variable Security
+### Credential Method Priority
 
-For production use, prefer environment variables over command-line flags:
+Credentials are loaded in this order (first available wins):
+
+1. Command-line flags (`--username` and `--password`)
+2. Credential file (`--credential-file`)
+3. Environment variables (`UNIFI_USERNAME`, `UNIFI_PASSWORD`)
+4. System keychain (`--keychain` with `--keychain-account`)
+5. Standard input (`--stdin` or interactive prompt)
+
+### Secure Credential Examples
 
 ```bash
-# Secure - not visible in process list
+# Most secure: Use credential file (recommended)
+unifi-scheduler credential create --file ~/.unifi-creds.json
+unifi-scheduler --credential-file ~/.unifi-creds.json client list
+
+# Secure: Use system keychain
+unifi-scheduler credential store-keychain --service unifi --account admin
+unifi-scheduler --keychain --keychain-account admin client list
+
+# Secure: Use environment variables
+export UNIFI_USERNAME="admin"
 export UNIFI_PASSWORD="secret"
 unifi-scheduler client list
 
-# Less secure - visible in process list
-unifi-scheduler --password secret client list
+# Interactive: Read from stdin
+unifi-scheduler --stdin client list
+
+# Less secure: Command-line flags (visible in process list)
+unifi-scheduler --username admin --password secret client list
 ```
 
 ### Debug Output Safety
@@ -219,42 +307,63 @@ unifi-scheduler --debug client list
 ### Basic Network Management
 
 ```bash
+# Setup credentials once
+unifi-scheduler credential create --file ~/.unifi-creds.json
+
 # Check who's connected
-unifi-scheduler client list
+unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client list
 
 # Block a problematic device
-unifi-scheduler client block "Suspicious-Device"
+unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json client block "Suspicious-Device"
 
 # Monitor recent network activity
-unifi-scheduler event list
+unifi-scheduler --endpoint https://controller --credential-file ~/.unifi-creds.json event list
 ```
 
 ### Advanced Operations
 
 ```bash
+# Create a config file for convenience
+cat > ~/.unifi-scheduler.yaml <<EOF
+endpoint: "https://controller.local"
+credential-file: "~/.unifi-creds.json"
+EOF
+
+# Now commands are much shorter
+unifi-scheduler client list
+
 # Set up a device with static IP
 unifi-scheduler user set \
   --mac "aa:bb:cc:dd:ee:ff" \
   --name "Security Camera" \
   --ip "192.168.1.50"
 
-# Use raw API for custom operations
-unifi-scheduler raw GET "/stat/device" | jq '.data[] | select(.type=="udm")'
+# Use raw API for custom operations with jq
+unifi-scheduler --output json raw GET "/stat/device" | jq '.data[] | select(.type=="udm")'
 
 # Run NATS caching agent for fast data access
-unifi-scheduler --config prod.yaml nats agent
+unifi-scheduler --nats_url nats://server:4222 nats agent
 ```
 
 ### Batch Operations
 
 ```bash
 #!/bin/bash
-# Block multiple devices
+# Block multiple devices (assumes config file is set up)
 DEVICES=("Bad-Device-1" "Bad-Device-2" "Suspicious-Phone")
 
 for device in "${DEVICES[@]}"; do
     echo "Blocking $device"
     unifi-scheduler client block "$device"
+done
+
+# Or with explicit credentials
+ENDPOINT="https://controller"
+CREDS="~/.unifi-creds.json"
+
+for device in "${DEVICES[@]}"; do
+    echo "Blocking $device"
+    unifi-scheduler --endpoint "$ENDPOINT" --credential-file "$CREDS" client block "$device"
 done
 ```
 
@@ -362,8 +471,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### Recent Improvements
 
-- ✅ **Security**: Implemented secure credential management with automatic secret scrubbing
-- ✅ **Testing**: Added comprehensive test suite with >29% coverage
-- ✅ **Reliability**: Removed application crashes with proper error handling
-- ✅ **Performance**: Added configurable timeouts and retry logic
-- ✅ **NATS Integration**: Enhanced distributed operations support
+- **Security**: Implemented secure credential management with multiple methods (file, keychain, stdin)
+- **TLS**: Added comprehensive TLS configuration with custom CA, mutual TLS, and version control
+- **Testing**: Added comprehensive test suite with 54.5% coverage in core pkg/unifi
+- **Reliability**: Proper error handling throughout with circuit breakers and backoff strategies
+- **Performance**: Configurable timeouts and retry logic
+- **NATS Integration**: Enhanced distributed operations with caching and event publishing
+- **Multi-Site**: Support for multi-site UniFi controllers
+- **IPv6**: IPv6 delegated prefix detection and monitoring
+- **Output Formats**: Support for table, JSON, and YAML output formats
