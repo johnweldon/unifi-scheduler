@@ -63,6 +63,10 @@ func (n *Publisher) publishWithContext(ctx context.Context, subject string, msg 
 		return fmt.Errorf("publish: cannot publish data: %w", err)
 	}
 
+	if err = n.conn.Flush(); err != nil {
+		return fmt.Errorf("publish: cannot flush connection: %w", err)
+	}
+
 	return nil
 }
 
