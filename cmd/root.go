@@ -228,7 +228,25 @@ func initSession(cmd *cobra.Command) (*unifi.Session, error) {
 
 	var outio, errio io.Writer
 
-	nc, err := nats.Connect(natsURL)
+	// Build NATS connection options with credentials if available
+	natsOpts := []nats.Option{
+		nats.Timeout(natsConnTimeout),
+	}
+
+	// Check for NATS credentials from flag, environment (UNIFI_NATS_CREDS), or standard NATS_CREDS
+	credsPath := natsCreds
+	if credsPath == "" {
+		credsPath = os.Getenv("NATS_CREDS")
+	}
+
+	if credsPath != "" {
+		natsOpts = append(natsOpts, nats.UserCredentials(credsPath))
+		if debug {
+			fmt.Fprintf(cmd.ErrOrStderr(), "using NATS credentials from: %s\n", credsPath)
+		}
+	}
+
+	nc, err := nats.Connect(natsURL, natsOpts...)
 	if err != nil {
 		// Continue without NATS logging
 		if debug {

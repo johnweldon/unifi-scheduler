@@ -8,3 +8,4 @@ list
 unblock
 unifi-scheduler
 vendor/
+.local*

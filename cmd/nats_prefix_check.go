@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/johnweldon/unifi-scheduler/pkg/nats"
 )
@@ -170,6 +171,11 @@ func init() { // nolint: gochecknoinits
 	flags.StringVar(&prefixCheckHostname, "hostname", "", "hostname to query for AAAA record (env: UNIFI_PREFIX_CHECK_HOSTNAME)")
 	flags.StringVar(&prefixCheckSubject, "subject", "", "NATS subject to publish prefix updates (env: UNIFI_PREFIX_CHECK_SUBJECT)")
 	flags.BoolVar(&prefixCheckForce, "force", false, "publish message even if prefix is unchanged (env: UNIFI_PREFIX_CHECK_FORCE)")
+
+	// Bind custom environment variable names to flags
+	cobra.CheckErr(viper.BindEnv("hostname", "UNIFI_PREFIX_CHECK_HOSTNAME"))
+	cobra.CheckErr(viper.BindEnv("subject", "UNIFI_PREFIX_CHECK_SUBJECT"))
+	cobra.CheckErr(viper.BindEnv("force", "UNIFI_PREFIX_CHECK_FORCE"))
 
 	cobra.CheckErr(natsPrefixCheckCmd.MarkFlagRequired("hostname"))
 	cobra.CheckErr(natsPrefixCheckCmd.MarkFlagRequired("subject"))
