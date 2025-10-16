@@ -2,6 +2,7 @@ package unifi
 
 import (
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 )
@@ -82,6 +83,7 @@ type Device struct {
 	ManufacturerID             int64                 `json:"manufacturer_id,omitempty"`
 	Model                      string                `json:"model,omitempty"`
 	Name                       string                `json:"name,omitempty"`
+	NetworkTable               []NetworkTable        `json:"network_table,omitempty"`
 	NextHeartbeatAt            TimeStamp             `json:"next_heartbeat_at,omitempty"`
 	NextInterval               Duration              `json:"next_interval,omitempty"`
 	NumSTA                     int64                 `json:"num_sta,omitempty"`
@@ -138,6 +140,96 @@ func (d *Device) String() string {
 	return fmt.Sprintf("%25s   %-15s %-4s %-35s %s", d.Name, d.IP, temp, d.SystemStats, traffic)
 }
 
+// GetIPv6DelegatedPrefix extracts the IPv6 delegated prefix, auto-detecting the size.
+// Supports /48, /56, and /64 delegations.
+// Returns empty string if no IPv6 subnet is configured.
+func (d *Device) GetIPv6DelegatedPrefix() string {
+	if len(d.NetworkTable) == 0 || len(d.NetworkTable[0].IPv6Subnets) == 0 {
+		return ""
+	}
+
+	// Detect delegation size by analyzing network patterns
+	delegationSize := d.detectDelegationSize()
+	return d.NetworkTable[0].getIPv6PrefixWithSize(delegationSize)
+}
+
+// detectDelegationSize determines prefix delegation size by analyzing subnet patterns.
+// Returns 48, 56, or 64.
+func (d *Device) detectDelegationSize() int {
+	if len(d.NetworkTable) < 2 {
+		return 56 // Default for single network
+	}
+
+	// Get first two networks with IPv6
+	var ip1, ip2 net.IP
+	for _, nt := range d.NetworkTable {
+		if len(nt.IPv6Subnets) > 0 && nt.IPv6Subnets[0] != "" {
+			_, ipnet, err := parseIPv6CIDR(nt.IPv6Subnets[0])
+			if err == nil && ipnet.IP.To16() != nil {
+				if ip1 == nil {
+					ip1 = ipnet.IP.To16()
+				} else if ip2 == nil {
+					ip2 = ipnet.IP.To16()
+					break
+				}
+			}
+		}
+	}
+
+	if ip1 == nil || ip2 == nil {
+		return 56
+	}
+
+	// Compare byte 6 (upper byte of 4th hextet)
+	// /48: byte 6 differs (e.g., 2605:59c0:40a6:0000 vs 2605:59c0:40a6:0100)
+	if ip1[6] != ip2[6] {
+		return 48
+	}
+
+	// Compare byte 7 (lower byte of 4th hextet)
+	// /56: byte 7 differs (e.g., 2605:59c0:40a6:e800 vs 2605:59c0:40a6:e801)
+	if ip1[7] != ip2[7] {
+		return 56
+	}
+
+	// /64: same prefix, networks differ elsewhere
+	return 64
+}
+
+// getIPv6PrefixWithSize extracts delegated prefix with specified size.
+func (n *NetworkTable) getIPv6PrefixWithSize(delegationSize int) string {
+	if len(n.IPv6Subnets) == 0 {
+		return ""
+	}
+
+	_, ipnet, err := parseIPv6CIDR(n.IPv6Subnets[0])
+	if err != nil {
+		return ""
+	}
+
+	mask := ipnet.IP.Mask(ipnet.Mask).To16()
+	if mask == nil {
+		return ""
+	}
+
+	// Zero out bytes after delegation boundary
+	startByte := delegationSize / 8
+	for i := startByte; i < 16; i++ {
+		mask[i] = 0
+	}
+
+	return fmt.Sprintf("%s/%d", net.IP(mask).String(), delegationSize)
+}
+
+// parseIPv6CIDR parses an IPv6 CIDR notation and returns the IP and IPNet.
+func parseIPv6CIDR(cidr string) (net.IP, *net.IPNet, error) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ip, ipnet, nil
+}
+
 type ConfigNetwork struct {
 	DNS1        string `json:"dns1,omitempty"`
 	DNS2        string `json:"dns2,omitempty"`
@@ -146,6 +238,28 @@ type ConfigNetwork struct {
 	IP          IP     `json:"ip,omitempty"`
 	Netmask     string `json:"netmask,omitempty"`
 	NetworkType string `json:"type,omitempty"`
+}
+
+type NetworkTable struct {
+	ID                          string   `json:"_id,omitempty"`
+	Name                        string   `json:"name,omitempty"`
+	Purpose                     string   `json:"purpose,omitempty"`
+	IPSubnet                    string   `json:"ip_subnet,omitempty"`
+	IPv6Enabled                 bool     `json:"ipv6_enabled,omitempty"`
+	IPv6InterfaceType           string   `json:"ipv6_interface_type,omitempty"`
+	IPv6PDInterface             string   `json:"ipv6_pd_interface,omitempty"`
+	IPv6PDPrefixID              int64    `json:"ipv6_pd_prefixid,omitempty"`
+	IPv6PDAutoPrefixIDEnabled   bool     `json:"ipv6_pd_auto_prefixid_enabled,omitempty"`
+	IPv6Subnets                 []string `json:"ipv6_subnets,omitempty"`
+	IPv6ClientAddressAssignment string   `json:"ipv6_client_address_assignment,omitempty"`
+	IPv6RAEnabled               bool     `json:"ipv6_ra_enabled,omitempty"`
+	IPv6SettingPreference       string   `json:"ipv6_setting_preference,omitempty"`
+	WANDHCPv6PDSizeAuto         bool     `json:"wan_dhcpv6_pd_size_auto,omitempty"`
+	Enabled                     bool     `json:"enabled,omitempty"`
+	IsNAT                       bool     `json:"is_nat,omitempty"`
+	DHCPDEnabled                bool     `json:"dhcpd_enabled,omitempty"`
+	VLANEnabled                 bool     `json:"vlan_enabled,omitempty"`
+	VLAN                        string   `json:"vlan,omitempty"`
 }
 
 type EthernetDevice struct {
