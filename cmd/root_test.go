@@ -9,6 +9,10 @@ import (
 )
 
 func TestVersionCommand(t *testing.T) {
+	// The root command marks --endpoint required; satisfy it hermetically so
+	// the test does not depend on the local environment.
+	t.Setenv("UNIFI_ENDPOINT", "https://controller.example.com")
+
 	// Set a test version
 	Version = "test-version"
 
