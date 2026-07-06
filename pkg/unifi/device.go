@@ -259,7 +259,7 @@ type NetworkTable struct {
 	IsNAT                       bool     `json:"is_nat,omitempty"`
 	DHCPDEnabled                bool     `json:"dhcpd_enabled,omitempty"`
 	VLANEnabled                 bool     `json:"vlan_enabled,omitempty"`
-	VLAN                        string   `json:"vlan,omitempty"`
+	VLAN                        Number   `json:"vlan,omitempty"`
 }
 
 type EthernetDevice struct {

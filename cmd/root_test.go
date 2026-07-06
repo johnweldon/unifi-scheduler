@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -106,6 +107,25 @@ func TestPostInitConfigFunction(t *testing.T) {
 	err := postInitConfig(commands)
 	if err != nil {
 		t.Errorf("postInitConfig() returned error: %v", err)
+	}
+}
+
+// TestConfigureEnv_HyphenatedFlags verifies hyphenated flag names resolve
+// from underscore-form environment variables (e.g. --tls-insecure from
+// UNIFI_TLS_INSECURE).
+func TestConfigureEnv_HyphenatedFlags(t *testing.T) {
+	t.Setenv("UNIFI_TLS_INSECURE", "true")
+	t.Setenv("UNIFI_ENDPOINT", "https://controller.example.com")
+
+	v := viper.New()
+	configureEnv(v)
+
+	if !v.GetBool("tls-insecure") {
+		t.Error("expected tls-insecure to be settable via UNIFI_TLS_INSECURE")
+	}
+
+	if got := v.GetString("endpoint"); got != "https://controller.example.com" {
+		t.Errorf("expected endpoint from UNIFI_ENDPOINT, got %q", got)
 	}
 }
 

@@ -83,6 +83,12 @@ func (n *Number) UnmarshalJSON(b []byte) error {
 			return err
 		}
 
+		if s == "" {
+			*n = 0
+
+			return nil
+		}
+
 		if i, err = strconv.ParseInt(s, 10, 64); err != nil {
 			return err
 		}

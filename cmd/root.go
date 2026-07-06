@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -160,10 +161,9 @@ func initConfig() {
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".unifi-scheduler")
-		viper.SetEnvPrefix("unifi")
 	}
 
-	viper.AutomaticEnv()
+	configureEnv(viper.GetViper())
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
@@ -173,6 +173,15 @@ func initConfig() {
 		fmt.Fprintf(os.Stderr, "Error during configuration: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// configureEnv binds UNIFI_-prefixed environment variables, mapping
+// hyphenated flag names to underscore form (e.g. --tls-insecure reads
+// UNIFI_TLS_INSECURE).
+func configureEnv(v *viper.Viper) {
+	v.SetEnvPrefix("unifi")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.AutomaticEnv()
 }
 
 func postInitConfig(commands []*cobra.Command) error {

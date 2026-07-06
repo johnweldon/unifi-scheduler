@@ -177,49 +177,29 @@ func TestSession_BuildURL_WithSite(t *testing.T) {
 		endpoint     string
 		site         string
 		path         string
-		nonUDMPro    bool
 		expectedPath string
 	}{
 		{
-			name:         "default site with UDM Pro",
+			name:         "default site",
 			endpoint:     "https://controller.example.com",
 			site:         "",
 			path:         "/stat/user",
-			nonUDMPro:    false,
 			expectedPath: "/proxy/network/api/s/default/stat/user",
 		},
 		{
-			name:         "custom site with UDM Pro",
+			name:         "custom site",
 			endpoint:     "https://controller.example.com",
 			site:         "branch-office",
 			path:         "/stat/user",
-			nonUDMPro:    false,
 			expectedPath: "/proxy/network/api/s/branch-office/stat/user",
-		},
-		{
-			name:         "default site without UDM Pro",
-			endpoint:     "https://controller.example.com",
-			site:         "",
-			path:         "/stat/user",
-			nonUDMPro:    true,
-			expectedPath: "/api/s/default/stat/user",
-		},
-		{
-			name:         "custom site without UDM Pro",
-			endpoint:     "https://controller.example.com",
-			site:         "branch-office",
-			path:         "/stat/user",
-			nonUDMPro:    true,
-			expectedPath: "/api/s/branch-office/stat/user",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			session := &Session{
-				Endpoint:  tt.endpoint,
-				site:      tt.site,
-				nonUDMPro: tt.nonUDMPro,
+				Endpoint: tt.endpoint,
+				site:     tt.site,
 			}
 
 			url, err := session.buildURL(tt.path)
@@ -233,6 +213,46 @@ func TestSession_BuildURL_WithSite(t *testing.T) {
 
 			if url.Host != "controller.example.com" {
 				t.Errorf("Expected host controller.example.com, got %q", url.Host)
+			}
+		})
+	}
+}
+
+func TestSession_BuildV2URL_WithSite(t *testing.T) {
+	tests := []struct {
+		name         string
+		site         string
+		path         string
+		expectedPath string
+	}{
+		{
+			name:         "default site",
+			site:         "",
+			path:         "/system-log/all",
+			expectedPath: "/proxy/network/v2/api/site/default/system-log/all",
+		},
+		{
+			name:         "custom site",
+			site:         "branch-office",
+			path:         "/system-log/all",
+			expectedPath: "/proxy/network/v2/api/site/branch-office/system-log/all",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := &Session{
+				Endpoint: "https://controller.example.com",
+				site:     tt.site,
+			}
+
+			url, err := session.buildV2URL(tt.path)
+			if err != nil {
+				t.Fatalf("buildV2URL failed: %v", err)
+			}
+
+			if url.Path != tt.expectedPath {
+				t.Errorf("Expected path %q, got %q", tt.expectedPath, url.Path)
 			}
 		})
 	}

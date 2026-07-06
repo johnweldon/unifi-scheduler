@@ -109,8 +109,7 @@ type Session struct {
 	err    error                  // Last error encountered during operations
 
 	// Controller configuration
-	nonUDMPro bool   // Flag indicating non-UDM Pro controller type
-	site      string // Site identifier for multi-site controllers
+	site string // Site identifier for multi-site controllers
 
 	// Output and logging configuration
 	outWriter io.Writer // Writer for standard output
@@ -821,9 +820,15 @@ func (s *Session) Raw(method, path string, body io.Reader) (string, error) {
 }
 
 // ListEvents describes the latest events.
+//
+// Deprecated: the /stat/event endpoint was removed from UniFi Network and
+// returns 404 on current releases. Use GetRecentEvents instead.
 func (s *Session) ListEvents() (string, error) { return s.action(http.MethodGet, "/stat/event", nil) }
 
 // ListAllEvents describes all events.
+//
+// Deprecated: the /rest/event endpoint was removed from UniFi Network and
+// returns 404 on current releases. Use GetAllEvents instead.
 func (s *Session) ListAllEvents() (string, error) {
 	return s.action(http.MethodGet, "/rest/event", nil)
 }
@@ -1006,34 +1011,69 @@ func (s *Session) getDevices() (map[string]Device, error) {
 	return devices, nil
 }
 
-// getEvents returns a list of events. If all is true, then all known events
-// will be returned, otherwise only the most recent ones will be returned.
+// getEvents returns a list of events from the v2 system-log API. If all is
+// true, every available page is fetched, otherwise only the first page of the
+// most recent events is returned.
+//
+// The legacy /stat/event and /rest/event endpoints were removed from UniFi
+// Network (they return 404 on current releases), so events are sourced from
+// POST /v2/api/site/{site}/system-log/all instead.
 func (s *Session) getEvents(all bool) ([]Event, error) {
-	var (
-		eventsJSON string
-		eresp      EventResponse
-
-		err error
+	const (
+		recentPageSize = 100
+		fullPageSize   = 500
+		maxPages       = 50 // Safety limit when paginating all events
 	)
 
-	fetch := s.ListEvents
+	pageSize, pages := recentPageSize, 1
 	if all {
-		fetch = s.ListAllEvents
+		pageSize, pages = fullPageSize, maxPages
 	}
 
-	if eventsJSON, err = fetch(); err != nil {
-		return nil, fmt.Errorf("fetching events: %w", err)
-	}
+	var events []Event
 
-	if err = json.Unmarshal([]byte(eventsJSON), &eresp); err != nil {
-		return nil, fmt.Errorf("unmarshalling events: %w", err)
-	}
+	for page := 0; page < pages; page++ {
+		resp, err := s.getSystemLogPage(page, pageSize)
+		if err != nil {
+			return nil, fmt.Errorf("fetching events: %w", err)
+		}
 
-	events := eresp.Data
+		for _, entry := range resp.Data {
+			events = append(events, entry.ToEvent())
+		}
+
+		if page >= resp.TotalPageCount-1 || len(resp.Data) == 0 {
+			break
+		}
+	}
 
 	DefaultEventSort.Sort(events)
 
 	return events, nil
+}
+
+// getSystemLogPage fetches a single page from the v2 system-log API.
+func (s *Session) getSystemLogPage(page, pageSize int) (*SystemLogResponse, error) {
+	payload, err := json.Marshal(SystemLogRequest{
+		Categories: systemLogCategories,
+		PageNumber: page,
+		PageSize:   pageSize,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshalling system log request: %w", err)
+	}
+
+	body, err := s.actionV2(http.MethodPost, "/system-log/all", bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("fetching system log page %d: %w", page, err)
+	}
+
+	var resp SystemLogResponse
+	if err = json.Unmarshal([]byte(body), &resp); err != nil {
+		return nil, fmt.Errorf("unmarshalling system log: %w", err)
+	}
+
+	return &resp, nil
 }
 
 // webLogin performs the authentication for this session.
@@ -1071,24 +1111,31 @@ func (s *Session) webLogin() (string, error) {
 	return respBody, err
 }
 
-// buildURL generates the endpoint URL relevant to the configured
-// version of UniFi.
+// buildURL generates the endpoint URL for the legacy /api/s/{site} API.
 func (s *Session) buildURL(path string) (*url.URL, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 
-	pathPrefix := "/proxy/network"
-	if s.nonUDMPro {
-		pathPrefix = ""
+	return url.Parse(fmt.Sprintf("%s/proxy/network/api/s/%s%s", s.Endpoint, s.siteName(), path))
+}
+
+// buildV2URL generates the endpoint URL for the v2 API, which uses the
+// /v2/api/site/{site} path shape instead of /api/s/{site}.
+func (s *Session) buildV2URL(path string) (*url.URL, error) {
+	if s.err != nil {
+		return nil, s.err
 	}
 
-	site := "default"
+	return url.Parse(fmt.Sprintf("%s/proxy/network/v2/api/site/%s%s", s.Endpoint, s.siteName(), path))
+}
+
+func (s *Session) siteName() string {
 	if len(s.site) > 0 {
-		site = s.site
+		return s.site
 	}
 
-	return url.Parse(fmt.Sprintf("%s%s/api/s/%s%s", s.Endpoint, pathPrefix, site, path))
+	return "default"
 }
 
 // macAction applies an action to a single MAC.
@@ -1161,17 +1208,24 @@ func (s *Session) setUserDetails(id, name, ip string) (string, error) {
 }
 
 func (s *Session) action(method, path string, body io.Reader) (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-
 	u, err := s.buildURL(path)
 	if err != nil {
-		s.setError(err)
-
-		return "", s.err
+		return "", err
 	}
 
+	return s.dispatch(method, u, body)
+}
+
+func (s *Session) actionV2(method, path string, body io.Reader) (string, error) {
+	u, err := s.buildV2URL(path)
+	if err != nil {
+		return "", err
+	}
+
+	return s.dispatch(method, u, body)
+}
+
+func (s *Session) dispatch(method string, u *url.URL, body io.Reader) (string, error) {
 	switch method {
 	case http.MethodGet:
 		return s.get(u)
@@ -1198,7 +1252,6 @@ func (s *Session) put(u fmt.Stringer, body io.Reader) (string, error) {
 
 func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, error) {
 	var result string
-	var responseError error
 
 	// Create a context for the entire operation with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
@@ -1259,8 +1312,6 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 						return fmt.Errorf("login attempt failed: %w", err)
 					}
 					// Return retryable error for re-authentication
-					responseError = fmt.Errorf("re-authentication required")
-					result = string(respBody)
 					return fmt.Errorf("%w: re-authentication required", ErrRetryableHTTP)
 				} else if IsRetryableHTTPError(resp.StatusCode) {
 					// Return retryable error for HTTP errors that should be retried
@@ -1275,23 +1326,19 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 			return nil
 		})
 	})
-	// Handle errors from retry/circuit breaker
+	// Errors from a single request (including retry/circuit breaker) are
+	// scoped to this operation. They are deliberately NOT persisted on the
+	// session: a failing endpoint (e.g. one removed by a controller upgrade)
+	// must not poison subsequent requests to healthy endpoints.
 	if err != nil {
 		if errors.Is(err, ErrCircuitBreakerOpen) {
-			s.setError(err)
 			return "", fmt.Errorf("circuit breaker open, service unavailable: %w", err)
 		}
-		s.setError(err)
-		return "", s.err
+
+		return "", err
 	}
 
-	// Handle authentication errors that succeeded with retry
-	if responseError != nil {
-		s.setError(responseError)
-		return result, s.err
-	}
-
-	return result, s.err
+	return result, nil
 }
 
 func (s *Session) setError(e error) {
