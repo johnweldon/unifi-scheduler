@@ -1326,8 +1326,8 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 					// Return retryable error for HTTP errors that should be retried
 					return fmt.Errorf("%w: http error: %s", ErrRetryableHTTP, resp.Status)
 				} else {
-					// Non-retryable HTTP error
-					return fmt.Errorf("http error: %s", resp.Status)
+					// Definitive response: not retried, not a breaker failure
+					return fmt.Errorf("%w: http error: %s", ErrPermanentHTTP, resp.Status)
 				}
 			}
 

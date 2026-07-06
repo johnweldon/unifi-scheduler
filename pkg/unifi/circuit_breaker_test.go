@@ -2,6 +2,7 @@ package unifi
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -241,4 +242,35 @@ func containsAt(s, substr string, start int) bool {
 		return true
 	}
 	return containsAt(s, substr, start+1)
+}
+
+// TestCircuitBreaker_PermanentHTTPErrorsDoNotTrip verifies that permanent
+// HTTP errors (4xx: the server answered definitively, so it is healthy) do
+// not count toward opening the circuit, while transport-level errors still do.
+func TestCircuitBreaker_PermanentHTTPErrorsDoNotTrip(t *testing.T) {
+	cb := NewCircuitBreaker(CircuitBreakerConfig{
+		MaxFailures:      2,
+		ResetTimeout:     time.Minute,
+		SuccessThreshold: 1,
+	})
+
+	permErr := fmt.Errorf("%w: http error: 404 Not Found", ErrPermanentHTTP)
+
+	for i := 0; i < 10; i++ {
+		if err := cb.Execute(func() error { return permErr }); !errors.Is(err, ErrPermanentHTTP) {
+			t.Fatalf("attempt %d: expected permanent error passed through, got %v", i, err)
+		}
+	}
+
+	if got := cb.Stats().State; got != CircuitBreakerClosed {
+		t.Errorf("expected circuit to stay closed after permanent HTTP errors, got %v", got)
+	}
+
+	for i := 0; i < 2; i++ {
+		_ = cb.Execute(func() error { return errors.New("connection refused") })
+	}
+
+	if got := cb.Stats().State; got != CircuitBreakerOpen {
+		t.Errorf("expected circuit open after transport errors, got %v", got)
+	}
 }

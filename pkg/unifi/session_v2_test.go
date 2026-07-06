@@ -190,6 +190,37 @@ func TestSession_GetAllEvents_PaginatesV2SystemLog(t *testing.T) {
 	}
 }
 
+// TestSession_DeadEndpointDoesNotTripCircuitBreaker verifies that an
+// endpoint returning permanent HTTP errors (e.g. removed by a controller
+// upgrade, like /stat/event was) never opens the session-wide circuit
+// breaker, which would block healthy endpoints for every consumer.
+func TestSession_DeadEndpointDoesNotTripCircuitBreaker(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/stat/device") {
+			okDataJSON(w, `[]`)
+			return
+		}
+		notFoundJSON(w)
+	})
+
+	session, _ := newTestSession(t, handler)
+
+	// Exceed the default MaxFailures (5) with back-to-back permanent errors.
+	for i := 0; i < 8; i++ {
+		if _, err := session.GetRecentEvents(); err == nil {
+			t.Fatal("expected events fetch to fail, got nil error")
+		}
+	}
+
+	if _, err := session.GetDevices(); err != nil {
+		t.Fatalf("device fetch blocked after dead-endpoint failures: %v", err)
+	}
+
+	if got := session.CircuitBreakerStats().State; got != CircuitBreakerClosed {
+		t.Errorf("expected circuit breaker to stay closed, got %v", got)
+	}
+}
+
 // TestSession_GetUserByMAC_UsesStatUser verifies the by-MAC lookup uses the
 // /stat/user/{mac} endpoint. The previous /rest/user/?mac= form is silently
 // ignored by current UniFi Network releases, which return ALL users -- making

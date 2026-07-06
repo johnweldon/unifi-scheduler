@@ -82,14 +82,17 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 
 	// Execute the function
 	err := fn()
-	// Update state based on result
-	if err != nil {
+	// Update state based on result. Permanent HTTP errors are definitive
+	// responses from a reachable server, so they count as breaker successes:
+	// the breaker guards transport-level distress (timeouts, 5xx, refused
+	// connections), not endpoints that no longer exist.
+	if err != nil && !errors.Is(err, ErrPermanentHTTP) {
 		cb.onFailure()
 		return err
 	}
 
 	cb.onSuccess()
-	return nil
+	return err
 }
 
 // canExecute determines if a request can be executed based on the current state

@@ -303,6 +303,10 @@ var (
 	ErrTimeout = errors.New("timeout error")
 	// ErrNetworkUnavailable represents network unavailability errors
 	ErrNetworkUnavailable = errors.New("network unavailable")
+	// ErrPermanentHTTP marks definitive non-retryable HTTP responses (4xx).
+	// The server answered, so these prove connectivity is healthy: they are
+	// not retried and do not count toward opening the circuit breaker.
+	ErrPermanentHTTP = errors.New("permanent HTTP error")
 )
 
 // IsRetryableHTTPError checks if an HTTP status code indicates a retryable error
