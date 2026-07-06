@@ -145,6 +145,11 @@ func (n *Client) Init(opts ...ClientOpt) {
 	}
 }
 
+// IsConnected reports whether the underlying NATS connection exists and is live.
+func (n *Client) IsConnected() bool {
+	return n.conn != nil && n.conn.IsConnected()
+}
+
 func (n *Client) ensureConnection() error {
 	var err error
 

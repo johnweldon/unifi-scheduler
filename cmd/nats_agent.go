@@ -62,6 +62,9 @@ This enables other instances to query cached data via 'nats clients' and
 		a := nats.NewAgent(ses, baseSubject, opts...)
 		cobra.CheckErr(a.Start(ctx))
 
+		// Optional health/pprof HTTP server (disabled unless an address is set).
+		nats.StartHealthServer(ctx, healthzAddr, a.Connected)
+
 		markInterval := time.After(1 * time.Second)
 		hourInterval := time.After(1 * time.Hour)
 
@@ -83,6 +86,13 @@ This enables other instances to query cached data via 'nats clients' and
 	},
 }
 
+const healthzAddrFlag = "healthz_addr"
+
+var healthzAddr = ""
+
 func init() { // nolint: gochecknoinits
+	natsAgentCmd.Flags().StringVar(&healthzAddr, healthzAddrFlag, healthzAddr,
+		"listen address for the optional /healthz and pprof HTTP server (e.g. :8080); disabled when empty")
+
 	natsCmd.AddCommand(natsAgentCmd)
 }

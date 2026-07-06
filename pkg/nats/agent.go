@@ -61,6 +61,12 @@ func (a *Agent) Start(ctx context.Context) error {
 	return nil
 }
 
+// Connected reports whether the agent's NATS publisher connection is live. It
+// backs the /healthz endpoint when the optional health server is enabled.
+func (a *Agent) Connected() bool {
+	return a.publisher != nil && a.publisher.IsConnected()
+}
+
 func (a *Agent) healthCheck(ctx context.Context) error {
 	log.Printf("performing health checks...")
 
