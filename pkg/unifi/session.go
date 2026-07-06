@@ -842,8 +842,11 @@ func (s *Session) GetUser(id string) (string, error) {
 }
 
 // GetUserByMAC returns user info.
+//
+// Uses /stat/user/{mac}: the former /rest/user/?mac= query form is silently
+// ignored by current UniFi Network releases, which return every known user.
 func (s *Session) GetUserByMAC(mac string) (string, error) {
-	return s.action(http.MethodGet, "/rest/user/?mac="+mac, nil)
+	return s.action(http.MethodGet, "/stat/user/"+mac, nil)
 }
 
 // SetUserDetails configures a friendly name and static ip assignation
@@ -914,6 +917,12 @@ func (s *Session) getUserByMac(mac string) (*Client, error) {
 
 	if len(resp.Data) < 1 {
 		return nil, fmt.Errorf("zero results: %s", data)
+	}
+
+	// Guard against endpoints that ignore the MAC and return other users;
+	// callers like SetUserDetails mutate the returned record.
+	if !strings.EqualFold(resp.Data[0].MAC.String(), mac) {
+		return nil, fmt.Errorf("controller returned user %q for requested mac %q", resp.Data[0].MAC, mac)
 	}
 
 	return &resp.Data[0], nil

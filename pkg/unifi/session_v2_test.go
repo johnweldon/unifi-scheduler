@@ -190,6 +190,46 @@ func TestSession_GetAllEvents_PaginatesV2SystemLog(t *testing.T) {
 	}
 }
 
+// TestSession_GetUserByMAC_UsesStatUser verifies the by-MAC lookup uses the
+// /stat/user/{mac} endpoint. The previous /rest/user/?mac= form is silently
+// ignored by current UniFi Network releases, which return ALL users -- making
+// Data[0] (and thus SetUserDetails) target an arbitrary wrong user.
+func TestSession_GetUserByMAC_UsesStatUser(t *testing.T) {
+	const mac = "f0:a2:25:b4:15:e8"
+
+	var gotPath string
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		okDataJSON(w, fmt.Sprintf(`[{"_id":"u1","mac":%q,"name":"printer"}]`, mac))
+	})
+
+	session, _ := newTestSession(t, handler)
+
+	if _, err := session.GetUserByMAC(mac); err != nil {
+		t.Fatalf("GetUserByMAC failed: %v", err)
+	}
+
+	if want := "/proxy/network/api/s/default/stat/user/" + mac; gotPath != want {
+		t.Errorf("expected path %q, got %q", want, gotPath)
+	}
+}
+
+// TestSession_GetUserByMac_RejectsWrongUser verifies the lookup fails loudly
+// if the controller returns a different client than the requested MAC, rather
+// than letting SetUserDetails modify an arbitrary user.
+func TestSession_GetUserByMac_RejectsWrongUser(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		okDataJSON(w, `[{"_id":"u-other","mac":"00:08:22:e8:ad:fb","name":"someone-else"}]`)
+	})
+
+	session, _ := newTestSession(t, handler)
+
+	if _, err := session.getUserByMac("f0:a2:25:b4:15:e8"); err == nil {
+		t.Fatal("expected error when controller returns a different user, got nil")
+	}
+}
+
 // TestSession_FailingEventsFetchDoesNotPoisonSession is the regression test
 // for the sticky session error: a failing events fetch must not block
 // subsequent device/client/user fetches.
