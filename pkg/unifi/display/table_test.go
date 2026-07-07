@@ -258,6 +258,204 @@ func TestEventsTableWithUnknownEvent(t *testing.T) {
 	}
 }
 
+func TestEventsTableWithV2ConnectedEvent(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:        "CLIENT_CONNECTED_WIRELESS_2",
+			Client:     unifi.MAC("22:e2:16:26:09:80"),
+			Name:       "simeon-chromecast",
+			DeviceName: "unifi-ap-casita",
+			ESSID:      "weldon",
+			TimeStamp:  unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 connected output:\n%s", output)
+
+	if !strings.Contains(output, "simeon-chromecast") {
+		t.Error("Output should contain client name simeon-chromecast")
+	}
+	if !strings.Contains(output, "unifi-ap-casita") {
+		t.Error("Output should contain access point name as TO")
+	}
+	if strings.Contains(output, "CLIENT_CONNECTED_WIRELESS_2") {
+		t.Error("Output should not contain the raw v2 event key")
+	}
+	if !strings.Contains(output, "Connected Wireless") {
+		t.Error("Output should contain readable event name")
+	}
+}
+
+func TestEventsTableWithV2RoamEvent(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:            "CLIENT_ROAMED_2",
+			Client:         unifi.MAC("2e:1a:fb:0e:20:d2"),
+			Name:           "john-pixel-9",
+			DeviceFromName: "unifi-ap-main-1",
+			DeviceToName:   "unifi-ap-indoor",
+			TimeStamp:      unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 roam output:\n%s", output)
+
+	if !strings.Contains(output, "john-pixel-9") {
+		t.Error("Output should contain client name john-pixel-9")
+	}
+	if !strings.Contains(output, "unifi-ap-main-1") {
+		t.Error("Output should contain FROM access point")
+	}
+	if !strings.Contains(output, "unifi-ap-indoor") {
+		t.Error("Output should contain TO access point")
+	}
+	if !strings.Contains(output, "Roamed") {
+		t.Error("Output should contain readable event name Roamed")
+	}
+}
+
+func TestEventsTableWithV2DisconnectedEvent(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:        "CLIENT_DISCONNECTED_WIRED_2",
+			Client:     unifi.MAC("bc:24:11:a8:22:1b"),
+			Name:       "WIN-NSC8FGN021O 22:1b",
+			DeviceName: "unifi-switch-1 Port 3",
+			TimeStamp:  unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 disconnect output:\n%s", output)
+
+	if !strings.Contains(output, "WIN-NSC8FGN021O 22:1b") {
+		t.Error("Output should contain client name")
+	}
+	if !strings.Contains(output, "unifi-switch-1 Port 3") {
+		t.Error("Output should contain switch+port as FROM")
+	}
+}
+
+func TestEventsTableWithV2Event_NameFallsBackToMACLookup(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:       "CLIENT_CONNECTED_WIRELESS_2",
+			Client:    unifi.MAC("22:e2:16:26:09:80"),
+			TimeStamp: unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		if mac == unifi.MAC("22:e2:16:26:09:80") {
+			return "LookedUpName", true
+		}
+
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 MAC fallback output:\n%s", output)
+
+	if !strings.Contains(output, "LookedUpName") {
+		t.Error("Output should contain name resolved via MAC lookup")
+	}
+}
+
+func TestEventsTableWithV2DeviceEvent(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:        "AP_CHANGED_CHANNELS",
+			Device:     unifi.MAC("f4:92:bf:59:a8:17"),
+			DeviceName: "unifi-ap-mesh-1",
+			TimeStamp:  unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 device event output:\n%s", output)
+
+	if !strings.Contains(output, "unifi-ap-mesh-1") {
+		t.Error("Output should contain device name for device-scoped event")
+	}
+	if !strings.Contains(output, "AP Changed Channels") {
+		t.Error("Output should contain readable event name with AP kept uppercase")
+	}
+}
+
+func TestEventsTableWithV2AdminEvent(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:       "ADMIN_ACCESS",
+			Admin:     "John Weldon",
+			TimeStamp: unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	t.Logf("V2 admin event output:\n%s", output)
+
+	if !strings.Contains(output, "John Weldon") {
+		t.Error("Output should contain admin name")
+	}
+	if !strings.Contains(output, "Admin Access") {
+		t.Error("Output should contain readable event name")
+	}
+}
+
+func TestEventsTableWithShortKeyDoesNotPanic(t *testing.T) {
+	var buf bytes.Buffer
+
+	events := []unifi.Event{
+		{
+			Key:       "EVT_X",
+			TimeStamp: unifi.TimeStamp(time.Now().Unix()),
+		},
+	}
+
+	displayName := func(mac unifi.MAC) (string, bool) {
+		return "", false
+	}
+
+	output := EventsTable(&buf, displayName, events).Render()
+	if output == "" {
+		t.Error("EventsTable should render output for short event keys")
+	}
+}
+
 func TestStyleDefault(t *testing.T) {
 	// Test that StyleDefault is properly configured
 	if StyleDefault.Name != "StyleDefault" {

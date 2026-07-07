@@ -117,5 +117,31 @@ func (e SystemLogEntry) ToEvent() Event {
 		evt.IP = IP(client.IP)
 	}
 
+	// DEVICE_WITH_PORT carries the same device with the port appended to the
+	// name (e.g. "unifi-switch-1 Port 3"), so it wins over plain DEVICE.
+	if device, ok := e.Parameters["DEVICE_WITH_PORT"]; ok {
+		evt.Device = MAC(device.ID)
+		evt.DeviceName = device.Name
+	} else if device, ok := e.Parameters["DEVICE"]; ok {
+		evt.Device = MAC(device.ID)
+		evt.DeviceName = device.Name
+	}
+
+	if from, ok := e.Parameters["DEVICE_FROM"]; ok {
+		evt.DeviceFromName = from.Name
+	}
+
+	if to, ok := e.Parameters["DEVICE_TO"]; ok {
+		evt.DeviceToName = to.Name
+	}
+
+	if wlan, ok := e.Parameters["WLAN"]; ok {
+		evt.ESSID = wlan.Name
+	}
+
+	if admin, ok := e.Parameters["ADMIN"]; ok {
+		evt.Admin = admin.Name
+	}
+
 	return evt
 }

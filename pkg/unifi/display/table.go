@@ -101,10 +101,55 @@ func EventsTable(out io.Writer, displayName func(unifi.MAC) (string, bool), even
 	}
 
 	for _, event := range events {
-		name := getName(event.MAC)
-		evt := event.Key[7:]
+		var name string
+		evt := string(event.Key)
 		to := "-"
 		from := "-"
+
+		if strings.HasPrefix(evt, "EVT_") {
+			name = getName(event.MAC)
+			if len(evt) > 7 {
+				evt = evt[7:]
+			}
+		} else {
+			// v2 system-log events (e.g. CLIENT_ROAMED_2) carry resolved
+			// names and device names directly instead of role-specific MACs.
+			evt = humanizeV2Key(evt)
+
+			name = event.Name
+			if name == "" && event.Client != "" {
+				if n, ok := displayName(event.Client); ok {
+					name = n
+				}
+			}
+			if name == "" {
+				name = event.Hostname
+			}
+			if name == "" {
+				name = string(event.Client)
+			}
+			if name == "" {
+				name = event.DeviceName
+			}
+			if name == "" {
+				name = event.Admin
+			}
+
+			key := string(event.Key)
+			switch {
+			case event.DeviceFromName != "" || event.DeviceToName != "":
+				if event.DeviceFromName != "" {
+					from = event.DeviceFromName
+				}
+				if event.DeviceToName != "" {
+					to = event.DeviceToName
+				}
+			case strings.Contains(key, "DISCONNECTED") && event.DeviceName != "":
+				from = event.DeviceName
+			case strings.Contains(key, "CONNECTED") && event.DeviceName != "":
+				to = event.DeviceName
+			}
+		}
 
 		switch event.Key {
 
@@ -232,6 +277,32 @@ func EventsTable(out io.Writer, displayName func(unifi.MAC) (string, bool), even
 	t.AppendFooter(table.Row{fmt.Sprintf("Total %d", t.Length())})
 
 	return t
+}
+
+// v2KeyAcronyms are v2 system-log key tokens kept fully uppercase when
+// humanizing keys for display.
+var v2KeyAcronyms = map[string]bool{
+	"AP": true, "DHCP": true, "DNS": true, "ID": true, "IP": true,
+	"ISP": true, "LAN": true, "POE": true, "VPN": true, "WAN": true,
+	"WLAN": true,
+}
+
+// humanizeV2Key turns a v2 system-log key such as CLIENT_CONNECTED_WIRELESS_2
+// into a readable event name like "Connected Wireless".
+func humanizeV2Key(key string) string {
+	key = strings.TrimSuffix(key, "_2")
+	key = strings.TrimPrefix(key, "CLIENT_")
+
+	words := strings.Split(key, "_")
+	for i, word := range words {
+		if v2KeyAcronyms[word] || word == "" {
+			continue
+		}
+
+		words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
+	}
+
+	return strings.Join(words, " ")
 }
 
 var StyleDefault = table.Style{

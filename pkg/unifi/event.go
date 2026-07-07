@@ -73,6 +73,7 @@ type Event struct {
 	AccessPointTo      MAC       `json:"ap_to,omitempty"`
 	Bridge             MAC       `json:"bb,omitempty"`
 	Client             MAC       `json:"client,omitempty"`
+	Device             MAC       `json:"device,omitempty"`
 	DM                 MAC       `json:"dm,omitempty"`
 	Gateway            MAC       `json:"gw,omitempty"`
 	Guest              MAC       `json:"guest,omitempty"`
@@ -94,6 +95,9 @@ type Event struct {
 	ChannelFrom        Number    `json:"channel_from,omitempty"`
 	ChannelTo          Number    `json:"channel_to,omitempty"`
 	CurlStatus         string    `json:"curl_rc,omitempty"`
+	DeviceFromName     string    `json:"device_from_name,omitempty"`
+	DeviceName         string    `json:"device_name,omitempty"`
+	DeviceToName       string    `json:"device_to_name,omitempty"`
 	DMDisplay          string    `json:"dm_displayName,omitempty"`
 	DMModel            string    `json:"dm_model,omitempty"`
 	DMName             string    `json:"dm_name,omitempty"`
