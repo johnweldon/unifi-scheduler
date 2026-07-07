@@ -1,7 +1,11 @@
 package nats
 
 import (
+	"context"
+	"fmt"
 	"testing"
+
+	"github.com/johnweldon/unifi-scheduler/pkg/unifi"
 )
 
 func TestDetailBucket(t *testing.T) {
@@ -248,5 +252,48 @@ func TestAgentConstants(t *testing.T) {
 	}
 	if EventsKey != "events" {
 		t.Errorf("EventsKey = %q, want %q", EventsKey, "events")
+	}
+}
+
+// TestWithRetry_PermanentErrorsNotRetried verifies withRetry gives up
+// immediately on permanent HTTP errors (4xx) that the session layer already
+// classified as non-retryable, instead of burning ~7s of backoff per cycle.
+func TestWithRetry_PermanentErrorsNotRetried(t *testing.T) {
+	a := &Agent{}
+
+	calls := 0
+	err := a.withRetry(context.Background(), "probe", func(ctx context.Context) error {
+		calls++
+		return fmt.Errorf("fetching: %w", unifi.ErrPermanentHTTP)
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if calls != 1 {
+		t.Errorf("expected 1 attempt for permanent error, got %d", calls)
+	}
+}
+
+// TestWithRetry_TransientErrorsStillRetried verifies transient errors keep
+// their retry behavior.
+func TestWithRetry_TransientErrorsStillRetried(t *testing.T) {
+	a := &Agent{}
+
+	calls := 0
+	err := a.withRetry(context.Background(), "probe", func(ctx context.Context) error {
+		calls++
+		if calls == 1 {
+			return fmt.Errorf("transient failure")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("expected success after retry, got %v", err)
+	}
+
+	if calls != 2 {
+		t.Errorf("expected 2 attempts, got %d", calls)
 	}
 }

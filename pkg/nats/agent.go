@@ -348,6 +348,12 @@ func (a *Agent) withRetry(ctx context.Context, operation string, fn func(context
 			return nil
 		}
 
+		// Permanent HTTP errors (4xx) were already classified as
+		// non-retryable by the session layer; retrying only wastes time.
+		if errors.Is(err, unifi.ErrPermanentHTTP) {
+			return fmt.Errorf("%s: %w", operation, err)
+		}
+
 		if attempt == maxRetries {
 			return fmt.Errorf("%s: final attempt failed after %d retries: %w", operation, maxRetries, err)
 		}

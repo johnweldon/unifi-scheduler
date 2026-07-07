@@ -3,6 +3,7 @@ package unifi
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -329,5 +330,60 @@ func TestSession_FailingEventsFetchDoesNotPoisonSession(t *testing.T) {
 
 	if _, err := session.GetDevices(); err != nil {
 		t.Fatalf("device fetch after second failed events fetch: %v", err)
+	}
+}
+
+// TestSession_SetUserDetails_PreservesNetworkAndGroup verifies the update
+// payload carries the user's existing network_id and usergroup_id instead of
+// a hardcoded network and a blank group.
+func TestSession_SetUserDetails_PreservesNetworkAndGroup(t *testing.T) {
+	const mac = "aa:bb:cc:dd:ee:ff"
+
+	var putBody string
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/stat/user/"+mac):
+			okDataJSON(w, fmt.Sprintf(
+				`[{"_id":"u1","mac":%q,"name":"old-name","network_id":"net-123","usergroup_id":"grp-456"}]`, mac,
+			))
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/rest/user/u1"):
+			b, _ := io.ReadAll(r.Body)
+			putBody = string(b)
+			okDataJSON(w, `[]`)
+		default:
+			notFoundJSON(w)
+		}
+	})
+
+	session, _ := newTestSession(t, handler)
+
+	if _, err := session.SetUserDetails(mac, "new-name", "10.0.0.9"); err != nil {
+		t.Fatalf("SetUserDetails failed: %v", err)
+	}
+
+	if putBody == "" {
+		t.Fatal("no PUT request reached the server")
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(putBody), &payload); err != nil {
+		t.Fatalf("PUT body is not valid JSON: %v\nbody: %s", err, putBody)
+	}
+
+	if got := payload["network_id"]; got != "net-123" {
+		t.Errorf("expected user's own network_id net-123, got %v", got)
+	}
+
+	if got := payload["usergroup_id"]; got != "grp-456" {
+		t.Errorf("expected user's own usergroup_id grp-456, got %v", got)
+	}
+
+	if got := payload["name"]; got != "new-name" {
+		t.Errorf("expected name new-name, got %v", got)
+	}
+
+	if got := payload["fixed_ip"]; got != "10.0.0.9" {
+		t.Errorf("expected fixed_ip 10.0.0.9, got %v", got)
 	}
 }

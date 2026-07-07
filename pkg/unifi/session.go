@@ -857,7 +857,7 @@ func (s *Session) SetUserDetails(mac, name, ip string) (string, error) {
 		return "", err
 	}
 
-	return s.setUserDetails(user.ID, name, ip)
+	return s.setUserDetails(user, name, ip)
 }
 
 // ListClients describes currently connected clients.
@@ -1189,8 +1189,10 @@ func (s *Session) clientsFn(action func(...MAC) (string, error), keys map[string
 	fmt.Fprintf(s.outWriter, "%s\n", res)
 }
 
-func (s *Session) setUserDetails(id, name, ip string) (string, error) {
-	if len(id) == 0 {
+// setUserDetails updates the user's name and fixed IP, preserving the
+// existing network and user group assignments from the fetched record.
+func (s *Session) setUserDetails(user *Client, name, ip string) (string, error) {
+	if user == nil || len(user.ID) == 0 {
 		return "", fmt.Errorf("missing user id")
 	}
 
@@ -1209,11 +1211,16 @@ func (s *Session) setUserDetails(id, name, ip string) (string, error) {
 
 	var buf bytes.Buffer
 
-	if err = tmpl.Execute(&buf, map[string]string{"Name": name, "IP": ip, "NetworkID": "5c82f1ce2679fb00116fb58e"}); err != nil {
+	if err = tmpl.Execute(&buf, map[string]string{
+		"Name":        name,
+		"IP":          ip,
+		"NetworkID":   user.NetworkID,
+		"UsergroupID": user.UsergroupID,
+	}); err != nil {
 		return "", err
 	}
 
-	return s.action(http.MethodPut, "/rest/user/"+id, &buf)
+	return s.action(http.MethodPut, "/rest/user/"+user.ID, &buf)
 }
 
 func (s *Session) action(method, path string, body io.Reader) (string, error) {
