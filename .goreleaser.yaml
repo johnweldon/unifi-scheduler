@@ -79,6 +79,3 @@ changelog:
       order: 1
     - title: Others
       order: 999
-
-release:
-  disable: true
