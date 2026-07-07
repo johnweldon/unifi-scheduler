@@ -52,3 +52,15 @@ func TestNetworkTable_VLANUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+// TestNumber_UnmarshalNull verifies JSON null does not fail Number fields.
+func TestNumber_UnmarshalNull(t *testing.T) {
+	var n Number
+	if err := json.Unmarshal([]byte(`null`), &n); err != nil {
+		t.Fatalf("unmarshalling null: %v", err)
+	}
+
+	if n != 0 {
+		t.Errorf("expected 0 for null, got %v", n)
+	}
+}

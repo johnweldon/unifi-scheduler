@@ -29,6 +29,10 @@ type Agent struct {
 	client    *unifi.Session
 	publisher *Publisher
 	base      string
+
+	// lastEventTS is the high-water mark of published event timestamps; only
+	// the single serve goroutine touches it.
+	lastEventTS unifi.TimeStamp
 }
 
 func (a *Agent) Start(ctx context.Context) error {
@@ -146,11 +150,18 @@ func (a *Agent) publishEventsWithContext(ctx context.Context) error {
 			return fmt.Errorf("get events: %w", err)
 		}
 
-		for _, evt := range events {
+		// Publish only events newer than the last poll; republishing the
+		// whole recent page would evict real history from the capped stream
+		// once the JetStream dedup window lapses.
+		fresh, maxTS := filterNewEvents(events, a.lastEventTS)
+
+		for _, evt := range fresh {
 			if err = a.publishStreamWithContext(ctx, EventStream(a.base), string(evt.Key), evt); err != nil {
 				return fmt.Errorf("publish events: %w", err)
 			}
 		}
+
+		a.lastEventTS = maxTS
 
 		const maxEvents = 500
 		if len(events) > maxEvents {
@@ -378,6 +389,26 @@ func (a *Agent) withRetry(ctx context.Context, operation string, fn func(context
 	}
 
 	return fmt.Errorf("unreachable")
+}
+
+// filterNewEvents returns the events strictly newer than lastTS and the new
+// high-water mark.
+func filterNewEvents(events []unifi.Event, lastTS unifi.TimeStamp) ([]unifi.Event, unifi.TimeStamp) {
+	var fresh []unifi.Event
+
+	maxTS := lastTS
+
+	for _, evt := range events {
+		if evt.TimeStamp > lastTS {
+			fresh = append(fresh, evt)
+		}
+
+		if evt.TimeStamp > maxTS {
+			maxTS = evt.TimeStamp
+		}
+	}
+
+	return fresh, maxTS
 }
 
 func NormalizeKey(s string) string {

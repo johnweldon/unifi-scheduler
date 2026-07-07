@@ -297,3 +297,37 @@ func TestWithRetry_TransientErrorsStillRetried(t *testing.T) {
 		t.Errorf("expected 2 attempts, got %d", calls)
 	}
 }
+
+// TestFilterNewEvents verifies only events newer than the high-water mark are
+// selected for stream publishing, so each poll cycle does not republish the
+// same recent events (which would evict real history from the capped stream
+// once the JetStream dedup window lapses).
+func TestFilterNewEvents(t *testing.T) {
+	events := []unifi.Event{
+		{ID: "e1", TimeStamp: 100},
+		{ID: "e2", TimeStamp: 200},
+		{ID: "e3", TimeStamp: 300},
+	}
+
+	fresh, maxTS := filterNewEvents(events, 200)
+
+	if len(fresh) != 1 || fresh[0].ID != "e3" {
+		t.Errorf("expected only e3 to be new, got %+v", fresh)
+	}
+
+	if maxTS != 300 {
+		t.Errorf("expected high-water mark 300, got %d", maxTS)
+	}
+
+	// First poll (zero mark) publishes everything.
+	fresh, maxTS = filterNewEvents(events, 0)
+	if len(fresh) != 3 || maxTS != 300 {
+		t.Errorf("expected all 3 events and mark 300, got %d events, mark %d", len(fresh), maxTS)
+	}
+
+	// Nothing new leaves the mark unchanged.
+	fresh, maxTS = filterNewEvents(events, 300)
+	if len(fresh) != 0 || maxTS != 300 {
+		t.Errorf("expected no new events and mark 300, got %d events, mark %d", len(fresh), maxTS)
+	}
+}
