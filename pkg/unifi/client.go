@@ -53,7 +53,7 @@ type Client struct {
 	DeviceCategory           int64   `json:"dev_cat,omitempty"`
 	DeviceFamily             int64   `json:"dev_family,omitempty"`
 	DeviceID                 int64   `json:"dev_id,omitempty"`
-	DeviceIDOverride         int64   `json:"dev_id_override,omitempty"`
+	DeviceIDOverride         Number  `json:"dev_id_override,omitempty"`
 	DeviceName               string  `json:"device_name,omitempty"`
 	DeviceVendor             int64   `json:"dev_vendor,omitempty"`
 	ESSID                    string  `json:"essid,omitempty"`
