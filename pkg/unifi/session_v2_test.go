@@ -387,3 +387,54 @@ func TestSession_SetUserDetails_PreservesNetworkAndGroup(t *testing.T) {
 		t.Errorf("expected fixed_ip 10.0.0.9, got %v", got)
 	}
 }
+
+// TestSession_ReauthRetryResendsBody verifies that a POST retried after a
+// 401 re-authentication sends the original request body again. The body was
+// previously drained by the first attempt, so the retry went out empty and
+// the controller answered 400 Bad Request.
+func TestSession_ReauthRetryResendsBody(t *testing.T) {
+	var systemLogCalls atomic.Int32
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/api/auth/login") {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{}`)
+			return
+		}
+
+		if !strings.Contains(r.URL.Path, "/system-log/") {
+			notFoundJSON(w)
+			return
+		}
+
+		if systemLogCalls.Add(1) == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		body, _ := io.ReadAll(r.Body)
+		var req SystemLogRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"data": [{"id": "evt-1", "key": "CLIENT_CONNECTED", "message_raw": "hello", "timestamp": 1751700000000}], "total_page_count": 1}`)
+	})
+
+	session, _ := newTestSession(t, handler)
+
+	events, err := session.GetRecentEvents()
+	if err != nil {
+		t.Fatalf("GetRecentEvents after re-auth failed: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+
+	if got := systemLogCalls.Load(); got != 2 {
+		t.Errorf("expected 2 system-log calls (401 then retry), got %d", got)
+	}
+}

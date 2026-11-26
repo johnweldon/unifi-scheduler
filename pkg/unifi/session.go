@@ -1273,16 +1273,20 @@ func (s *Session) verb(verb string, u fmt.Stringer, body io.Reader) (string, err
 	ctx, cancel := context.WithTimeout(context.Background(), s.httpTimeout)
 	defer cancel()
 
+	// Read the body once, since each retry attempt needs to send it again
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		if bodyBytes, err = io.ReadAll(body); err != nil {
+			return "", fmt.Errorf("failed to read request body: %w", err)
+		}
+	}
+
 	// Execute the HTTP request through backoff retry which wraps the circuit breaker
 	err := s.backoffRetry.Retry(ctx, func() error {
-		// Copy the body if it's provided, since it may need to be read multiple times on retry
 		var requestBody io.Reader
 		if body != nil {
-			if bodyBytes, readErr := io.ReadAll(body); readErr == nil {
-				requestBody = bytes.NewReader(bodyBytes)
-			} else {
-				return fmt.Errorf("failed to read request body: %w", readErr)
-			}
+			requestBody = bytes.NewReader(bodyBytes)
 		}
 
 		// Execute the HTTP request through the circuit breaker
